@@ -1,0 +1,13 @@
+{
+  "itemGroup.himmelsstein": "Example Mod Tab",
+  "block.himmelsstein.example_block": "Example Block",
+  "item.himmelsstein.example_item": "Example Item",
+
+  "himmelsstein.configuration.title": "Himmelsstein Configs",
+  "himmelsstein.configuration.section.himmelsstein.common.toml": "Himmelsstein Configs",
+  "himmelsstein.configuration.section.himmelsstein.common.toml.title": "Himmelsstein Configs",
+  "himmelsstein.configuration.items": "Item List",
+  "himmelsstein.configuration.logDirtBlock": "Log Dirt Block",
+  "himmelsstein.configuration.magicNumberIntroduction": "Magic Number Text",
+  "himmelsstein.configuration.magicNumber": "Magic Number"
+}
