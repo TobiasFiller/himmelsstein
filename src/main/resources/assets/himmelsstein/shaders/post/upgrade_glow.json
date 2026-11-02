@@ -1,0 +1,90 @@
+{
+    "targets": [
+        "swap",
+        "glow",
+        "halo",
+        "wide"
+    ],
+    "passes": [
+        {
+            "name": "himmelsstein:upgrade_glow_blur",
+            "intarget": "glow",
+            "outtarget": "swap",
+            "use_linear_filter": true,
+            "uniforms": [
+                { "name": "BlurDir", "values": [ 1.0, 0.0 ] }
+            ]
+        },
+        {
+            "name": "himmelsstein:upgrade_glow_blur",
+            "intarget": "swap",
+            "outtarget": "halo",
+            "use_linear_filter": true,
+            "uniforms": [
+                { "name": "BlurDir", "values": [ 0.0, 1.0 ] }
+            ]
+        },
+        {
+            "name": "himmelsstein:upgrade_glow_blur",
+            "intarget": "halo",
+            "outtarget": "swap",
+            "use_linear_filter": true,
+            "uniforms": [
+                { "name": "BlurDir", "values": [ 1.0, 0.0 ] },
+                { "name": "RadiusMultiplier", "values": [ 0.5 ] }
+            ]
+        },
+        {
+            "name": "himmelsstein:upgrade_glow_blur",
+            "intarget": "swap",
+            "outtarget": "halo",
+            "use_linear_filter": true,
+            "uniforms": [
+                { "name": "BlurDir", "values": [ 0.0, 1.0 ] },
+                { "name": "RadiusMultiplier", "values": [ 0.5 ] },
+                { "name": "Gain", "values": [ 0.77 ] }
+            ]
+        },
+        {
+            "name": "himmelsstein:upgrade_glow_blur",
+            "intarget": "wide",
+            "outtarget": "swap",
+            "use_linear_filter": true,
+            "uniforms": [
+                { "name": "BlurDir", "values": [ 1.0, 0.0 ] },
+                { "name": "RadiusMultiplier", "values": [ 3.5 ] }
+            ]
+        },
+        {
+            "name": "himmelsstein:upgrade_glow_blur",
+            "intarget": "swap",
+            "outtarget": "wide",
+            "use_linear_filter": true,
+            "uniforms": [
+                { "name": "BlurDir", "values": [ 0.0, 1.0 ] },
+                { "name": "RadiusMultiplier", "values": [ 3.5 ] }
+            ]
+        },
+        {
+            "name": "himmelsstein:upgrade_glow_blur",
+            "intarget": "wide",
+            "outtarget": "swap",
+            "use_linear_filter": true,
+            "uniforms": [
+                { "name": "BlurDir", "values": [ 1.0, 0.0 ] },
+                { "name": "RadiusMultiplier", "values": [ 1.75 ] }
+            ]
+        },
+        {
+            "name": "himmelsstein:upgrade_glow_blur",
+            "intarget": "swap",
+            "outtarget": "wide",
+            "use_linear_filter": true,
+            "uniforms": [
+                { "name": "BlurDir", "values": [ 0.0, 1.0 ] },
+                { "name": "RadiusMultiplier", "values": [ 1.75 ] },
+                { "name": "Gain", "values": [ 0.6 ] }
+            ]
+        }
+    ]
+}

@@ -41,10 +41,11 @@ import net.tobiasfiller.himmelsstein.core.command.WeaponUpgradeCommand;
 import net.tobiasfiller.himmelsstein.core.event.UpgradeEvents;
 import net.tobiasfiller.himmelsstein.core.registry.ModDataComponents;
 import net.tobiasfiller.himmelsstein.core.registry.ModItems;
+import net.tobiasfiller.himmelsstein.core.utility.UpgradeGlow;
 import net.tobiasfiller.himmelsstein.core.utility.UpgradeHelper;
 
 /**
- * Behavioural tests for the upgrade core (M1-M5 and M7).
+ * Behavioural tests for the upgrade core (M1-M7).
  *
  * <p>All tests use the tiny {@code himmelsstein:empty} structure, so they do not need a visible
  * build area. Most behaviour is exercised by calling the real event handlers directly; that keeps
@@ -305,6 +306,63 @@ public final class UpgradeGameTests {
         helper.assertTrue(upgraded.get(0).getStyle().getColor() != null
                         && upgraded.get(0).getStyle().getColor().getValue() == 0xAAAAAA,
                 "The tooltip line must be gray");
+
+        helper.succeed();
+    }
+
+    // ---------------------------------------------------------------- M6 glow aura
+
+    @GameTest(template = "empty")
+    public static void glowColorBlendsBetweenAnchors(GameTestHelper helper) {
+        helper.assertTrue(UpgradeGlow.color(0) == 0 && UpgradeGlow.intensity(0) == 0.0F,
+                "+0 must not glow");
+
+        int[][] expectedColors = {
+                {1, 0xFFFFFF}, {6, 0xFFFF55}, {11, 0xFFAA00}, {16, 0xFF5555}, {21, 0xFF55FF},
+                {26, 0xFFD700}, {30, 0xFFD700},
+                {3, 0xFFFFBB}, // 40 % from white to yellow
+                {8, 0xFFDD33}  // 40 % from yellow to orange
+        };
+        for (int[] entry : expectedColors) {
+            helper.assertTrue(UpgradeGlow.color(entry[0]) == entry[1],
+                    "+" + entry[0] + " must have colour " + Integer.toHexString(entry[1])
+                            + " but was " + Integer.toHexString(UpgradeGlow.color(entry[0])));
+        }
+
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void glowIntensityRisesUntilPeakThenStays(GameTestHelper helper) {
+        helper.assertTrue(close(UpgradeGlow.intensity(1), 0.02F), "+1 must glow at 2 %");
+        helper.assertTrue(close(UpgradeGlow.intensity(10), 0.135714F),
+                "+10 must glow at ~14 % but was " + UpgradeGlow.intensity(10));
+        helper.assertTrue(close(UpgradeGlow.intensity(15), 0.20F), "+15 must glow at 20 %");
+
+        float expectedStep = UpgradeGlow.intensity(2) - UpgradeGlow.intensity(1);
+        for (int level = 2; level <= UpgradeGlow.INTENSITY_PEAK_LEVEL; level++) {
+            float step = UpgradeGlow.intensity(level) - UpgradeGlow.intensity(level - 1);
+            helper.assertTrue(step > 0.0F && close(step, expectedStep),
+                    "Intensity must rise by the same step every level up to the peak (+" + level + ")");
+        }
+        for (int level = UpgradeGlow.INTENSITY_PEAK_LEVEL + 1; level <= UpgradeHelper.MAX_LEVEL; level++) {
+            helper.assertTrue(close(UpgradeGlow.intensity(level), 0.20F),
+                    "Intensity must stay at 20 % above the peak (+" + level + ")");
+        }
+
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void glowEffectsUnlockAtTheirLevels(GameTestHelper helper) {
+        helper.assertFalse(UpgradeGlow.hasWideAura(4), "+4 must not have the wide aura");
+        helper.assertTrue(UpgradeGlow.hasWideAura(5), "+5 must have the wide aura");
+        helper.assertFalse(UpgradeGlow.hasHandleLightning(14), "+14 must not have handle lightning");
+        helper.assertTrue(UpgradeGlow.hasHandleLightning(15), "+15 must have handle lightning");
+        helper.assertFalse(UpgradeGlow.hasBladeLightning(19), "+19 must not have blade lightning");
+        helper.assertTrue(UpgradeGlow.hasBladeLightning(20), "+20 must have blade lightning");
+        helper.assertTrue(UpgradeGlow.hasBladeLightning(30) && UpgradeGlow.hasHandleLightning(30)
+                && UpgradeGlow.hasWideAura(30), "+30 must have every effect");
 
         helper.succeed();
     }

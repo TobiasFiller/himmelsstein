@@ -6,7 +6,13 @@
   "mixins": [
     "ItemStackMixin"
   ],
-  "client": [],
+  "client": [
+    "client.CompositeRenderTypeAccessor",
+    "client.CompositeStateAccessor",
+    "client.EmptyTextureStateShardAccessor",
+    "client.GameRendererMixin",
+    "client.ItemRendererMixin"
+  ],
   "injectors": {
     "defaultRequire": 1
   }
