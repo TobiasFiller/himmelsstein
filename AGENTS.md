@@ -169,7 +169,7 @@ behaviour first. Put the roll in a server-side helper (e.g. `core/utility/Upgrad
 be unit-tested and reused by commands and menus. Cover the behaviour with a GameTest.
 
 **New command:** register it in a `RegisterCommandsEvent` handler on the game bus (the concept
-mentions `/equipment-upgrade [lvl]` as a development command). Commands must be server-side and
+mentions `/weaponupgrade [lvl]` as a development command). Commands must be server-side and
 respect the configured max level.
 
 **New block:** create the class in `common/block/` → register block and `BlockItem` → add

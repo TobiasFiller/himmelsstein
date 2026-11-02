@@ -1,39 +1,46 @@
 package net.tobiasfiller.himmelsstein;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.item.Item;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.fml.event.config.ModConfigEvent;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
-public class Config {
+/**
+ * Common config of the upgrade system.
+ *
+ * <p>The two tables are indexed by upgrade level (0-30) and are the single source of truth for
+ * the scaled values. The server is authoritative and syncs these tables to the client on join and
+ * after a config reload, so name, tooltip and the weapon attribute line use the same numbers.</p>
+ */
+public final class Config {
+    public static final int TABLE_SIZE = 31;
+
     private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
 
-    public static final ModConfigSpec.BooleanValue LOG_DIRT_BLOCK = BUILDER
-            .comment("Whether to log the dirt block on common setup")
-            .define("logDirtBlock", true);
+    public static final ModConfigSpec.ConfigValue<List<? extends Double>> WEAPON_DAMAGE = BUILDER
+            .comment("Flat attack damage added per upgrade level (index = level, 0-30).",
+                    "Default: +0.25 per level, so +10 = +2.5 and +30 = +7.5.")
+            .defineListAllowEmpty("weapon_damage", defaults(0.25D), () -> 0.0D, Config::isFiniteNumber);
 
-    public static final ModConfigSpec.IntValue MAGIC_NUMBER = BUILDER
-            .comment("A magic number")
-            .defineInRange("magicNumber", 42, 0, Integer.MAX_VALUE);
+    public static final ModConfigSpec.ConfigValue<List<? extends Double>> PROJECTILE_DAMAGE = BUILDER
+            .comment("Projectile damage bonus as a factor (index = level, 0-30).",
+                    "Default: +0.05 per level, so +10 = +50% and +30 = +150%.",
+                    "This is a placeholder until the bow balance question (O14) is decided.")
+            .defineListAllowEmpty("projectile_damage", defaults(0.05D), () -> 0.0D, Config::isFiniteNumber);
 
-    public static final ModConfigSpec.ConfigValue<String> MAGIC_NUMBER_INTRODUCTION = BUILDER
-            .comment("What you want the introduction message to be for the magic number")
-            .define("magicNumberIntroduction", "The magic number is... ");
+    public static final ModConfigSpec SPEC = BUILDER.build();
 
-    public static final ModConfigSpec.ConfigValue<List<? extends String>> ITEM_STRINGS = BUILDER
-            .comment("A list of items to log on common setup.")
-            .defineListAllowEmpty("items", List.of("minecraft:iron_ingot"), () -> "", Config::validateItemName);
+    private Config() {}
 
-    static final ModConfigSpec SPEC = BUILDER.build();
+    private static boolean isFiniteNumber(Object value) {
+        return value instanceof Number number && Double.isFinite(number.doubleValue());
+    }
 
-    private static boolean validateItemName(final Object obj) {
-        return obj instanceof String itemName && BuiltInRegistries.ITEM.containsKey(ResourceLocation.parse(itemName));
+    private static List<Double> defaults(double perLevel) {
+        List<Double> values = new ArrayList<>(TABLE_SIZE);
+        for (int level = 0; level < TABLE_SIZE; level++) {
+            values.add(level * perLevel);
+        }
+        return values;
     }
 }

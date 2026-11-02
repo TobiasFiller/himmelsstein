@@ -1,4 +1,4 @@
-package net.tobiasfiller.himmelsstein;
+package net.tobiasfiller.himmelsstein.client;
 
 import net.minecraft.client.Minecraft;
 import net.neoforged.api.distmarker.Dist;
@@ -9,6 +9,7 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
+import net.tobiasfiller.himmelsstein.Himmelsstein;
 
 @Mod(value = Himmelsstein.MODID, dist = Dist.CLIENT)
 @EventBusSubscriber(modid = Himmelsstein.MODID, value = Dist.CLIENT)
@@ -19,7 +20,7 @@ public class HimmelssteinClient {
 
     @SubscribeEvent
     static void onClientSetup(FMLClientSetupEvent event) {
-        Himmelsstein.LOGGER.info("HELLO FROM CLIENT SETUP");
-        Himmelsstein.LOGGER.info("MINECRAFT NAME >> {}", Minecraft.getInstance().getUser().getName());
+        Himmelsstein.LOGGER.info("Himmelsstein client setup (Minecraft {})",
+                Minecraft.getInstance().getUser().getName());
     }
 }

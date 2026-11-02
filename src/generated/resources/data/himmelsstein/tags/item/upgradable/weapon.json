@@ -1,0 +1,13 @@
+{
+  "values": [
+    "minecraft:trident",
+    "minecraft:mace",
+    "himmelsstein:upgrade_test_item",
+    "#minecraft:swords",
+    "#minecraft:axes",
+    {
+      "id": "#c:tools/melee_weapon",
+      "required": false
+    }
+  ]
+}

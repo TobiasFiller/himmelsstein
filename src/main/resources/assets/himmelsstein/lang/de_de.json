@@ -1,0 +1,18 @@
+{
+  "itemGroup.himmelsstein": "Himmelsstein",
+
+  "item.himmelsstein.upgrade_test_item": "Upgrade-Testitem",
+
+  "tooltip.himmelsstein.upgrade_level": "Upgrade: +%s",
+
+  "command.himmelsstein.weapon_upgrade.set": "%s auf +%s gesetzt.",
+  "command.himmelsstein.weapon_upgrade.not_upgradable": "%s ist nicht upgradebar.",
+  "command.himmelsstein.weapon_upgrade.out_of_range": "Level muss zwischen 0 und %s liegen.",
+  "command.himmelsstein.weapon_upgrade.no_item": "Du hältst kein Item in der Haupthand.",
+
+  "himmelsstein.configuration.title": "Himmelsstein-Konfiguration",
+  "himmelsstein.configuration.section.himmelsstein.common.toml": "Himmelsstein-Konfiguration",
+  "himmelsstein.configuration.section.himmelsstein.common.toml.title": "Himmelsstein-Konfiguration",
+  "himmelsstein.configuration.weapon_damage": "Waffenschaden-Tabelle",
+  "himmelsstein.configuration.projectile_damage": "Projektil-Schaden-Tabelle"
+}

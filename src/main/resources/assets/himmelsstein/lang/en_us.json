@@ -1,13 +1,18 @@
 {
-  "itemGroup.himmelsstein": "Example Mod Tab",
-  "block.himmelsstein.example_block": "Example Block",
-  "item.himmelsstein.example_item": "Example Item",
+  "itemGroup.himmelsstein": "Himmelsstein",
+
+  "item.himmelsstein.upgrade_test_item": "Upgrade Test Item",
+
+  "tooltip.himmelsstein.upgrade_level": "Upgrade: +%s",
+
+  "command.himmelsstein.weapon_upgrade.set": "%s set to +%s.",
+  "command.himmelsstein.weapon_upgrade.not_upgradable": "%s is not upgradable.",
+  "command.himmelsstein.weapon_upgrade.out_of_range": "Level must be between 0 and %s.",
+  "command.himmelsstein.weapon_upgrade.no_item": "You are not holding an item in your main hand.",
 
   "himmelsstein.configuration.title": "Himmelsstein Configs",
   "himmelsstein.configuration.section.himmelsstein.common.toml": "Himmelsstein Configs",
   "himmelsstein.configuration.section.himmelsstein.common.toml.title": "Himmelsstein Configs",
-  "himmelsstein.configuration.items": "Item List",
-  "himmelsstein.configuration.logDirtBlock": "Log Dirt Block",
-  "himmelsstein.configuration.magicNumberIntroduction": "Magic Number Text",
-  "himmelsstein.configuration.magicNumber": "Magic Number"
+  "himmelsstein.configuration.weapon_damage": "Weapon Damage Table",
+  "himmelsstein.configuration.projectile_damage": "Projectile Damage Table"
 }
