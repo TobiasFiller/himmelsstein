@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=north": {
+      "model": "himmelsstein:block/stone_altar"
+    },
+    "facing=east": {
+      "model": "himmelsstein:block/stone_altar",
+      "y": 90
+    },
+    "facing=south": {
+      "model": "himmelsstein:block/stone_altar",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "himmelsstein:block/stone_altar",
+      "y": 270
+    }
+  }
+}

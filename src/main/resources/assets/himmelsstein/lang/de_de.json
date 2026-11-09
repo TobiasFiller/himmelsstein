@@ -6,6 +6,11 @@
   "item.himmelsstein.power_stone": "Kraftstein",
   "item.himmelsstein.luck_stone": "Glücksstein",
 
+  "block.himmelsstein.stone_altar": "Steinaltar",
+  "container.himmelsstein.stone_altar": "Steinaltar",
+  "container.himmelsstein.stone_altar.sacrifice": "Klicken zum Opfern",
+  "container.himmelsstein.stone_altar.scrapping": "Wird geopfert...",
+
   "tooltip.himmelsstein.upgrade_level": "Upgrade: +%s",
 
   "command.himmelsstein.weapon_upgrade.set": "%s auf +%s gesetzt.",

@@ -23,6 +23,7 @@ public final class ModCreativeTabs {
                         output.accept(ModItems.HEAVEN_STONE.get());
                         output.accept(ModItems.POWER_STONE.get());
                         output.accept(ModItems.LUCK_STONE.get());
+                        output.accept(ModItems.STONE_ALTAR.get());
                     })
                     .build());
 

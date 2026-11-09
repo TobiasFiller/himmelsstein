@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "TTT",
+    "SIS",
+    "SSS"
+  ],
+  "key": {
+    "T": {
+      "tag": "minecraft:wool_carpets"
+    },
+    "I": {
+      "item": "minecraft:iron_ingot"
+    },
+    "S": {
+      "item": "minecraft:stone"
+    }
+  },
+  "result": {
+    "id": "himmelsstein:stone_altar",
+    "count": 1
+  }
+}

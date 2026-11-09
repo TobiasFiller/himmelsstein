@@ -1,5 +1,6 @@
 package net.tobiasfiller.himmelsstein.core.registry;
 
+import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Rarity;
 import net.neoforged.neoforge.registries.DeferredItem;
@@ -29,6 +30,9 @@ public final class ModItems {
     public static final DeferredItem<Item> LUCK_STONE = ITEMS.registerSimpleItem(
             "luck_stone",
             new Item.Properties().rarity(Rarity.RARE));
+
+    // Blocks
+    public static final DeferredItem<BlockItem> STONE_ALTAR = ITEMS.registerSimpleBlockItem(ModBlocks.STONE_ALTAR);
 
     private ModItems() {}
 }

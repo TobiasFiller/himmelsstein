@@ -1,0 +1,12 @@
+{
+  "power_stone": [
+    { "min_durability": 100, "count": 1 },
+    { "min_durability": 500, "count": 2 },
+    { "min_durability": 1000, "count": 3 }
+  ],
+  "heaven_stone": [
+    { "min_durability": 250, "chance": 0.02 },
+    { "min_durability": 1500, "chance": 0.1 },
+    { "min_durability": 2000, "chance": 0.2 }
+  ]
+}

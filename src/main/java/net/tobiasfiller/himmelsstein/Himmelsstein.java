@@ -8,9 +8,12 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
+import net.tobiasfiller.himmelsstein.core.registry.ModBlockEntities;
+import net.tobiasfiller.himmelsstein.core.registry.ModBlocks;
 import net.tobiasfiller.himmelsstein.core.registry.ModCreativeTabs;
 import net.tobiasfiller.himmelsstein.core.registry.ModDataComponents;
 import net.tobiasfiller.himmelsstein.core.registry.ModItems;
+import net.tobiasfiller.himmelsstein.core.registry.ModMenuTypes;
 import net.tobiasfiller.himmelsstein.network.UpgradeNetwork;
 
 @Mod(Himmelsstein.MODID)
@@ -20,7 +23,10 @@ public class Himmelsstein {
 
     public Himmelsstein(IEventBus modEventBus, ModContainer modContainer) {
         ModDataComponents.COMPONENTS.register(modEventBus);
+        ModBlocks.BLOCKS.register(modEventBus);
         ModItems.ITEMS.register(modEventBus);
+        ModBlockEntities.BLOCK_ENTITIES.register(modEventBus);
+        ModMenuTypes.MENUS.register(modEventBus);
         ModCreativeTabs.TABS.register(modEventBus);
 
         modEventBus.addListener(UpgradeNetwork::register);
