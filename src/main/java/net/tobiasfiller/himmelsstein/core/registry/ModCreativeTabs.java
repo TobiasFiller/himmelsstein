@@ -5,7 +5,6 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import net.tobiasfiller.himmelsstein.Himmelsstein;
@@ -19,10 +18,11 @@ public final class ModCreativeTabs {
             () -> CreativeModeTab.builder()
                     .title(Component.translatable("itemGroup.himmelsstein"))
                     .withTabsBefore(CreativeModeTabs.COMBAT)
-                    .icon(() -> new ItemStack(Items.NETHER_STAR))
+                    .icon(() -> new ItemStack(ModItems.HEAVEN_STONE.get()))
                     .displayItems((parameters, output) -> {
-                        // Real content lands with the stone/upgrade implementation. The synthetic
-                        // test item stays out of the creative menu on purpose.
+                        output.accept(ModItems.HEAVEN_STONE.get());
+                        output.accept(ModItems.POWER_STONE.get());
+                        output.accept(ModItems.LUCK_STONE.get());
                     })
                     .build());
 

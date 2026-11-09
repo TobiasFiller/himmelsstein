@@ -41,5 +41,8 @@ public final class ModItemTagsProvider extends ItemTagsProvider {
                 .add(Items.TRIDENT, Items.MACE, ModItems.UPGRADE_TEST_ITEM.get())
                 .addTags(ItemTags.SWORDS, ItemTags.AXES)
                 .addOptionalTag(Tags.Items.MELEE_WEAPON_TOOLS);
+
+        tag(ModTags.UPGRADE_STONES)
+                .add(ModItems.HEAVEN_STONE.get(), ModItems.POWER_STONE.get(), ModItems.LUCK_STONE.get());
     }
 }

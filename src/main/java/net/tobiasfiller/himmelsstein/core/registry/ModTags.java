@@ -9,6 +9,7 @@ import net.tobiasfiller.himmelsstein.Himmelsstein;
 public final class ModTags {
     public static final TagKey<Item> UPGRADABLE_WEAPON = tag("upgradable/weapon");
     public static final TagKey<Item> UPGRADABLE_PROJECTILE = tag("upgradable/projectile");
+    public static final TagKey<Item> UPGRADE_STONES = tag("upgrade_stones");
 
     private static TagKey<Item> tag(String path) {
         return TagKey.create(Registries.ITEM, ResourceLocation.fromNamespaceAndPath(Himmelsstein.MODID, path));

@@ -2,6 +2,9 @@
   "itemGroup.himmelsstein": "Himmelsstein",
 
   "item.himmelsstein.upgrade_test_item": "Upgrade Test Item",
+  "item.himmelsstein.heaven_stone": "Heaven Stone",
+  "item.himmelsstein.power_stone": "Power Stone",
+  "item.himmelsstein.luck_stone": "Luck Stone",
 
   "tooltip.himmelsstein.upgrade_level": "Upgrade: +%s",
 

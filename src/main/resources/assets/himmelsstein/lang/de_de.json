@@ -2,6 +2,9 @@
   "itemGroup.himmelsstein": "Himmelsstein",
 
   "item.himmelsstein.upgrade_test_item": "Upgrade-Testitem",
+  "item.himmelsstein.heaven_stone": "Himmelstein",
+  "item.himmelsstein.power_stone": "Kraftstein",
+  "item.himmelsstein.luck_stone": "Glücksstein",
 
   "tooltip.himmelsstein.upgrade_level": "Upgrade: +%s",
 

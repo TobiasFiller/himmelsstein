@@ -1,6 +1,7 @@
 package net.tobiasfiller.himmelsstein.core.registry;
 
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Rarity;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import net.tobiasfiller.himmelsstein.Himmelsstein;
@@ -15,6 +16,19 @@ public final class ModItems {
     public static final DeferredItem<Item> UPGRADE_TEST_ITEM = ITEMS.registerSimpleItem(
             "upgrade_test_item",
             new Item.Properties());
+
+    // Upgrade Stones
+    public static final DeferredItem<Item> HEAVEN_STONE = ITEMS.registerSimpleItem(
+            "heaven_stone",
+            new Item.Properties().rarity(Rarity.UNCOMMON));
+
+    public static final DeferredItem<Item> POWER_STONE = ITEMS.registerSimpleItem(
+            "power_stone",
+            new Item.Properties());
+
+    public static final DeferredItem<Item> LUCK_STONE = ITEMS.registerSimpleItem(
+            "luck_stone",
+            new Item.Properties().rarity(Rarity.RARE));
 
     private ModItems() {}
 }
