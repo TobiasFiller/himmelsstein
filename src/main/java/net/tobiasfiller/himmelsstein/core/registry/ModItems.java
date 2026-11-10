@@ -33,6 +33,7 @@ public final class ModItems {
 
     // Blocks
     public static final DeferredItem<BlockItem> STONE_ALTAR = ITEMS.registerSimpleBlockItem(ModBlocks.STONE_ALTAR);
+    public static final DeferredItem<BlockItem> UPGRADE_TABLE = ITEMS.registerSimpleBlockItem(ModBlocks.UPGRADE_TABLE);
 
     private ModItems() {}
 }

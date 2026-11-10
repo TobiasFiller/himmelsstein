@@ -7,6 +7,7 @@ import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import net.tobiasfiller.himmelsstein.Himmelsstein;
 import net.tobiasfiller.himmelsstein.common.menu.StoneAltarMenu;
+import net.tobiasfiller.himmelsstein.common.menu.UpgradeTableMenu;
 
 public final class ModMenuTypes {
     public static final DeferredRegister<MenuType<?>> MENUS =
@@ -14,6 +15,9 @@ public final class ModMenuTypes {
 
     public static final DeferredHolder<MenuType<?>, MenuType<StoneAltarMenu>> STONE_ALTAR =
             MENUS.register("stone_altar", () -> IMenuTypeExtension.create(StoneAltarMenu::new));
+
+    public static final DeferredHolder<MenuType<?>, MenuType<UpgradeTableMenu>> UPGRADE_TABLE =
+            MENUS.register("upgrade_table", () -> IMenuTypeExtension.create(UpgradeTableMenu::new));
 
     private ModMenuTypes() {}
 }

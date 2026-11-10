@@ -24,6 +24,7 @@ public final class ModCreativeTabs {
                         output.accept(ModItems.POWER_STONE.get());
                         output.accept(ModItems.LUCK_STONE.get());
                         output.accept(ModItems.STONE_ALTAR.get());
+                        output.accept(ModItems.UPGRADE_TABLE.get());
                     })
                     .build());
 

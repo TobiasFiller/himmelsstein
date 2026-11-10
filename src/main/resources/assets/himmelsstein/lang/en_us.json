@@ -11,6 +11,20 @@
   "container.himmelsstein.stone_altar.sacrifice": "Click to sacrifice",
   "container.himmelsstein.stone_altar.scrapping": "Sacrificing...",
 
+  "block.himmelsstein.upgrade_table": "Upgrade Table",
+  "container.himmelsstein.upgrade_table": "Upgrade Table",
+  "container.himmelsstein.upgrade_table.button": "Upgrade",
+  "container.himmelsstein.upgrade_table.rune_slot": "Reserved for protection runes",
+  "container.himmelsstein.upgrade_table.reason.no_item": "Place an upgradable item",
+  "container.himmelsstein.upgrade_table.reason.not_upgradable": "This item cannot be upgraded",
+  "container.himmelsstein.upgrade_table.reason.no_stone": "Place an upgrade stone",
+  "container.himmelsstein.upgrade_table.reason.not_a_stone": "This is not an upgrade stone",
+  "container.himmelsstein.upgrade_table.reason.max_level": "Maximum level for this stone reached",
+  "container.himmelsstein.upgrade_table.reason.rune_not_supported": "Protection runes are not supported yet",
+
+  "tooltip.himmelsstein.upgrade_table.chance": "Success chance: %s %%",
+  "tooltip.himmelsstein.upgrade_table.max_level": "Usable up to +%s",
+
   "tooltip.himmelsstein.upgrade_level": "Upgrade: +%s",
 
   "command.himmelsstein.weapon_upgrade.set": "%s set to +%s.",

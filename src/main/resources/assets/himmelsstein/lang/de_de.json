@@ -11,6 +11,20 @@
   "container.himmelsstein.stone_altar.sacrifice": "Klicken zum Opfern",
   "container.himmelsstein.stone_altar.scrapping": "Wird geopfert...",
 
+  "block.himmelsstein.upgrade_table": "Aufwertungstisch",
+  "container.himmelsstein.upgrade_table": "Aufwertungstisch",
+  "container.himmelsstein.upgrade_table.button": "Aufwerten",
+  "container.himmelsstein.upgrade_table.rune_slot": "Platz für Schutzrunen (folgt später)",
+  "container.himmelsstein.upgrade_table.reason.no_item": "Aufwertbares Item einlegen",
+  "container.himmelsstein.upgrade_table.reason.not_upgradable": "Dieses Item ist nicht aufwertbar",
+  "container.himmelsstein.upgrade_table.reason.no_stone": "Upgrade-Stein einlegen",
+  "container.himmelsstein.upgrade_table.reason.not_a_stone": "Das ist kein Upgrade-Stein",
+  "container.himmelsstein.upgrade_table.reason.max_level": "Maximales Level für diesen Stein erreicht",
+  "container.himmelsstein.upgrade_table.reason.rune_not_supported": "Schutzrunen werden noch nicht unterstützt",
+
+  "tooltip.himmelsstein.upgrade_table.chance": "Erfolgschance: %s %%",
+  "tooltip.himmelsstein.upgrade_table.max_level": "Nutzbar bis +%s",
+
   "tooltip.himmelsstein.upgrade_level": "Upgrade: +%s",
 
   "command.himmelsstein.weapon_upgrade.set": "%s auf +%s gesetzt.",

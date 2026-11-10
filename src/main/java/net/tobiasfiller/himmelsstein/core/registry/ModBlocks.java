@@ -8,6 +8,7 @@ import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import net.tobiasfiller.himmelsstein.Himmelsstein;
 import net.tobiasfiller.himmelsstein.common.block.StoneAltarBlock;
+import net.tobiasfiller.himmelsstein.common.block.UpgradeTableBlock;
 
 public final class ModBlocks {
     public static final DeferredRegister.Blocks BLOCKS = DeferredRegister.createBlocks(Himmelsstein.MODID);
@@ -17,6 +18,17 @@ public final class ModBlocks {
             StoneAltarBlock::new,
             BlockBehaviour.Properties.of()
                     .mapColor(MapColor.STONE)
+                    .strength(3.5F)
+                    .requiresCorrectToolForDrops()
+                    .sound(SoundType.STONE)
+                    .noOcclusion()
+                    .pushReaction(PushReaction.BLOCK));
+
+    public static final DeferredBlock<UpgradeTableBlock> UPGRADE_TABLE = BLOCKS.registerBlock(
+            "upgrade_table",
+            UpgradeTableBlock::new,
+            BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.DEEPSLATE)
                     .strength(3.5F)
                     .requiresCorrectToolForDrops()
                     .sound(SoundType.STONE)

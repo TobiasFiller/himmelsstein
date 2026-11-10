@@ -1,148 +1,143 @@
 package net.tobiasfiller.himmelsstein.core.utility;
 
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.HashMap;
+import java.util.Optional;
 
-import net.minecraft.resources.ResourceLocation;
+import javax.annotation.Nullable;
+
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+
+import net.minecraft.util.RandomSource;
+import net.minecraft.util.StringRepresentable;
 import net.minecraft.world.item.Item;
-import net.tobiasfiller.himmelsstein.Himmelsstein;
+import net.minecraft.world.item.ItemStack;
+import net.tobiasfiller.himmelsstein.core.registry.ModDataMaps;
 
 /**
- * Data class for upgrade stone properties.
- * 
- * <p>This class holds the configuration data for each upgrade stone type.
- * In a future version, this data should be loaded from datapack JSON files,
- * but for now it's hardcoded based on the design document.</p>
+ * Data-driven stats of one upgrade stone.
+ *
+ * <p>The values live in the {@code himmelsstein:upgrade_stone} data map
+ * ({@code data/himmelsstein/data_maps/item/upgrade_stone.json}) and are attached to the stone
+ * item, not to the stack. {@code success_chance} is indexed by the current upgrade level
+ * (0 .. {@code max_level - 1}). {@code fail_outcomes} is a weighted list of what happens on a
+ * failed roll; entries can be gated with {@code min_level}/{@code max_level}, and the remaining
+ * weights are normalized per level.</p>
  */
-public final class UpgradeStoneData {
-    
-    public enum FailMode {
-        KEEP,
-        DESTROY
-    }
+public record UpgradeStoneData(int maxLevel, List<Double> successChance, List<FailOutcome> failOutcomes) {
+    public enum FailOutcomeType implements StringRepresentable {
+        KEEP("keep"),
+        LOSE_LEVEL("lose_level"),
+        DESTROY("destroy");
 
-    private final int maxLevel;
-    private final List<Double> successChance;
-    private final FailMode failMode;
-    private final Integer destroyAboveLevel;
+        public static final Codec<FailOutcomeType> CODEC = StringRepresentable.fromEnum(FailOutcomeType::values);
 
-    public UpgradeStoneData(int maxLevel, List<Double> successChance, FailMode failMode, Integer destroyAboveLevel) {
-        this.maxLevel = maxLevel;
-        this.successChance = successChance;
-        this.failMode = failMode;
-        this.destroyAboveLevel = destroyAboveLevel;
-    }
+        private final String name;
 
-    public int getMaxLevel() {
-        return maxLevel;
-    }
-
-    public List<Double> getSuccessChance() {
-        return successChance;
-    }
-
-    public FailMode getFailMode() {
-        return failMode;
-    }
-
-    public Integer getDestroyAboveLevel() {
-        return destroyAboveLevel;
-    }
-
-    /**
-     * Gets the effective fail mode for a given current level.
-     * If destroyAboveLevel is set and currentLevel > destroyAboveLevel, returns DESTROY.
-     * Otherwise returns the configured failMode.
-     */
-    public FailMode getEffectiveFailMode(int currentLevel) {
-        if (destroyAboveLevel != null && currentLevel > destroyAboveLevel) {
-            return FailMode.DESTROY;
+        FailOutcomeType(String name) {
+            this.name = name;
         }
-        return failMode;
+
+        @Override
+        public String getSerializedName() {
+            return name;
+        }
     }
 
-    /**
-     * Gets the success chance for upgrading from the given current level.
-     * Returns 0 if the level is out of bounds.
-     */
+    /** One weighted failure result, optionally limited to a level range. */
+    public record FailOutcome(FailOutcomeType outcome, double weight, @Nullable Integer minLevel,
+            @Nullable Integer maxLevel) {
+        public static final Codec<FailOutcome> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+                FailOutcomeType.CODEC.fieldOf("outcome").forGetter(FailOutcome::outcome),
+                Codec.doubleRange(0.0D, 1.0E9D).fieldOf("weight").forGetter(FailOutcome::weight),
+                Codec.INT.optionalFieldOf("min_level").forGetter(outcome -> Optional.ofNullable(outcome.minLevel())),
+                Codec.INT.optionalFieldOf("max_level").forGetter(outcome -> Optional.ofNullable(outcome.maxLevel()))
+        ).apply(instance, (outcome, weight, min, max) ->
+                new FailOutcome(outcome, weight, min.orElse(null), max.orElse(null))));
+
+        public boolean isAvailable(int currentLevel) {
+            return (minLevel == null || currentLevel >= minLevel)
+                    && (maxLevel == null || currentLevel <= maxLevel);
+        }
+    }
+
+    public static final List<FailOutcome> DEFAULT_FAIL_OUTCOMES =
+            List.of(new FailOutcome(FailOutcomeType.KEEP, 1.0D, null, null));
+
+    public static final Codec<UpgradeStoneData> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+            Codec.intRange(0, UpgradeTables.MAX_LEVEL).fieldOf("max_level").forGetter(UpgradeStoneData::maxLevel),
+            Codec.doubleRange(0.0D, 100.0D).listOf().fieldOf("success_chance")
+                    .forGetter(UpgradeStoneData::successChance),
+            FailOutcome.CODEC.listOf().optionalFieldOf("fail_outcomes", DEFAULT_FAIL_OUTCOMES)
+                    .forGetter(UpgradeStoneData::failOutcomes)
+    ).apply(instance, (maxLevel, chances, outcomes) ->
+            new UpgradeStoneData(maxLevel, List.copyOf(chances), List.copyOf(outcomes))));
+
+    /** Success chance in percent for the current level; 0 for levels outside the table. */
     public double getSuccessChanceForLevel(int currentLevel) {
         if (currentLevel < 0 || currentLevel >= successChance.size()) {
-            return 0.0;
+            return 0.0D;
         }
         return successChance.get(currentLevel);
     }
 
-    // Pre-defined stone data based on the design document
-    
-    private static final UpgradeStoneData HEAVEN_STONE_DATA = new UpgradeStoneData(
-            30,
-            Arrays.asList(
-                100.0, 100.0, 100.0, 75.0, 60.0, 50.0, 42.86, 37.5, 33.33, 30.0,
-                27.27, 25.0, 23.08, 21.43, 20.0, 18.75, 17.65, 16.67, 15.79, 15.0,
-                14.29, 13.64, 13.04, 12.5, 12.0, 11.54, 11.11, 10.71, 10.34, 10.0
-            ),
-            FailMode.KEEP,
-            null
-    );
-
-    private static final UpgradeStoneData POWER_STONE_DATA = new UpgradeStoneData(
-            8,
-            Arrays.asList(100.0, 75.0, 50.0, 45.0, 40.0, 30.0, 25.0, 15.0),
-            FailMode.KEEP,
-            3  // Destroy on failure when current level > 3 (i.e., at level 4+)
-    );
-
-    private static final UpgradeStoneData LUCK_STONE_DATA = new UpgradeStoneData(
-            10,
-            Arrays.asList(
-                100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0
-            ),
-            FailMode.KEEP,
-            null
-    );
-
-    private static final Map<ResourceLocation, UpgradeStoneData> STONE_DATA_MAP = new HashMap<>();
-
-    static {
-        STONE_DATA_MAP.put(
-            ResourceLocation.fromNamespaceAndPath(Himmelsstein.MODID, "heaven_stone"),
-            HEAVEN_STONE_DATA
-        );
-        STONE_DATA_MAP.put(
-            ResourceLocation.fromNamespaceAndPath(Himmelsstein.MODID, "power_stone"),
-            POWER_STONE_DATA
-        );
-        STONE_DATA_MAP.put(
-            ResourceLocation.fromNamespaceAndPath(Himmelsstein.MODID, "luck_stone"),
-            LUCK_STONE_DATA
-        );
-    }
-
-    /**
-     * Gets the upgrade stone data for a given item.
-     */
-    public static UpgradeStoneData getData(Item item) {
-        ResourceLocation itemId = ResourceLocation.parse(item.getDescriptionId());
-        // descriptionId is like "item.himmelsstein.heaven_stone"
-        if (Himmelsstein.MODID.equals(itemId.getNamespace())) {
-            ResourceLocation key = ResourceLocation.fromNamespaceAndPath(Himmelsstein.MODID, itemId.getPath());
-            return STONE_DATA_MAP.get(key);
+    /** Outcomes that are allowed at the current level and have a positive weight. */
+    public List<FailOutcome> availableFailOutcomes(int currentLevel) {
+        List<FailOutcome> available = new ArrayList<>();
+        for (FailOutcome outcome : failOutcomes) {
+            if (outcome.weight() > 0.0D && outcome.isAvailable(currentLevel)) {
+                available.add(outcome);
+            }
         }
-        return null;
+        return available;
     }
 
     /**
-     * Gets the upgrade stone data for a given item registry name.
+     * Picks a failure outcome from the available ones. {@code roll} is in [0, 1); the available
+     * weights are normalized, so gated outcomes do not leave a gap.
      */
-    public static UpgradeStoneData getData(ResourceLocation itemId) {
-        return STONE_DATA_MAP.get(itemId);
+    public FailOutcomeType selectFailOutcome(int currentLevel, double roll) {
+        List<FailOutcome> available = availableFailOutcomes(currentLevel);
+        if (available.isEmpty()) {
+            return FailOutcomeType.KEEP;
+        }
+        double total = 0.0D;
+        for (FailOutcome outcome : available) {
+            total += outcome.weight();
+        }
+        if (total <= 0.0D) {
+            return FailOutcomeType.KEEP;
+        }
+
+        double target = Math.max(0.0D, Math.min(1.0D, roll)) * total;
+        double cumulative = 0.0D;
+        for (FailOutcome outcome : available) {
+            cumulative += outcome.weight();
+            if (target < cumulative) {
+                return outcome.outcome();
+            }
+        }
+        return available.get(available.size() - 1).outcome();
     }
 
-    /**
-     * Checks if an item is an upgrade stone.
-     */
+    public FailOutcomeType rollFailOutcome(int currentLevel, RandomSource random) {
+        return selectFailOutcome(currentLevel, random.nextDouble());
+    }
+
+    /** Data of the stone item, or {@code null} if it is not an upgrade stone. */
+    @SuppressWarnings("deprecation") // builtInRegistryHolder is the holder that carries data maps
+    public static @Nullable UpgradeStoneData getData(Item item) {
+        if (item == null) {
+            return null;
+        }
+        return item.builtInRegistryHolder().getData(ModDataMaps.UPGRADE_STONE);
+    }
+
+    public static @Nullable UpgradeStoneData getData(ItemStack stack) {
+        return stack.isEmpty() ? null : getData(stack.getItem());
+    }
+
     public static boolean isUpgradeStone(Item item) {
         return getData(item) != null;
     }

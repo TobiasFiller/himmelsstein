@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "himmelsstein:block/upgrade_table"
+    }
+  }
+}

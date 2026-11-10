@@ -44,5 +44,8 @@ public final class ModItemTagsProvider extends ItemTagsProvider {
 
         tag(ModTags.UPGRADE_STONES)
                 .add(ModItems.HEAVEN_STONE.get(), ModItems.POWER_STONE.get(), ModItems.LUCK_STONE.get());
+
+        // Empty until the protection rune items exist; the upgrade table's rune slot uses it.
+        tag(ModTags.PROTECTION_RUNES);
     }
 }

@@ -12,6 +12,7 @@ import net.tobiasfiller.himmelsstein.core.registry.ModBlockEntities;
 import net.tobiasfiller.himmelsstein.core.registry.ModBlocks;
 import net.tobiasfiller.himmelsstein.core.registry.ModCreativeTabs;
 import net.tobiasfiller.himmelsstein.core.registry.ModDataComponents;
+import net.tobiasfiller.himmelsstein.core.registry.ModDataMaps;
 import net.tobiasfiller.himmelsstein.core.registry.ModItems;
 import net.tobiasfiller.himmelsstein.core.registry.ModMenuTypes;
 import net.tobiasfiller.himmelsstein.network.UpgradeNetwork;
@@ -29,6 +30,7 @@ public class Himmelsstein {
         ModMenuTypes.MENUS.register(modEventBus);
         ModCreativeTabs.TABS.register(modEventBus);
 
+        modEventBus.addListener(ModDataMaps::register);
         modEventBus.addListener(UpgradeNetwork::register);
 
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
