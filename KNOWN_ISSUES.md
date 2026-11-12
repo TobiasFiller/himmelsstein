@@ -12,6 +12,10 @@ Zweck: In einer späteren Session direkt hier weiterarbeiten, ohne das Review zu
 - **Verifiziert:** `gradlew build` grün, `gradlew runGameTestServer` 15/15 grün.
 - **Nicht verifiziert:** das eigentliche Aussehen im Client (`gradlew runClient`). Die Mixins sind
   client-only, der GameTest-Server lädt sie nie.
+- **Nachtrag 2026-11-12:** KI-14 (Artefakte mit Shaderpack) und KI-16 (fehlende First-Person-Effekte
+  mit Shaderpack) behoben, KI-15 neu aufgenommen. Die Zeilenangaben der übrigen Einträge stammen
+  weiterhin vom 2026-11-02 und haben sich durch die Fixes um einige Zeilen verschoben – im Zweifel
+  über die genannten Methodennamen suchen.
 
 Betroffene Dateien (neu, aus dem Patch):
 
@@ -43,6 +47,9 @@ src/main/resources/assets/himmelsstein/shaders/**
 | KI-11| RenderType-Caches werden nie geleert               | Niedrig  | offen  |
 | KI-12| Balance-Werte nur im Code, nicht in der Vault-Note | Doku     | offen  |
 | KI-13| `UpgradeGlowRenderer` macht vier Dinge (571 Zeilen)| Refactor | offen  |
+| KI-14| Shaderpack: Effekte „wild in der Luft“             | Hoch     | behoben |
+| KI-15| Effekte umgehen das Shaderpack-Post-Processing     | Doku     | offen   |
+| KI-16| Shaderpack: keine Effekte in der First Person      | Hoch     | behoben |
 
 ---
 
@@ -265,6 +272,118 @@ Laut `AGENTS.md` vorher mit dem Menschen abstimmen (größerer Refactor).
 
 ---
 
+## KI-14 – Shaderpack: Effekte „wild in der Luft“ (behoben)
+
+**Schwere:** Hoch · **Status:** behoben am 2026-11-12
+
+**Ort:** `client/IrisCompat.java` (neu), `client/UpgradeGlowRenderer.java` (`replacesFoil`, `render`,
+`wrapCustomRenderer`)
+
+**Symptom:** Mit aktivem Shaderpack (Iris/Oculus) erschienen Glow, Glint und Blitze aufgewerteter
+Items nicht am Schwert, sondern als losgelöste Geometrie irgendwo in der Welt. Ohne Shaderpack trat
+es nie auf.
+
+**Ursache:** Shaderpacks rendern das Level ein zweites Mal in die Shadow-Map und rufen dabei den
+Vanilla-Item-Renderer für gehaltene Items erneut auf — mit der **Shadow-Kamera-Matrix** in der
+Item-Pose. `ItemRendererMixin` reichte beide Aufrufe ungefiltert an `UpgradeGlowRenderer` weiter, der
+die Eckpunkte munter aufzeichnete. Geflusht wird aber nur einmal, im Haupt-Pass (`AFTER_LEVEL`), und
+zwar mit den **Hauptkamera-Matrizen**. Die Shadow-Pass-Vertices landeten dadurch in einem völlig
+falschen Raum.
+
+**Fix:** `client/IrisCompat.isShadowPass()` liest per Reflection `ShadowRenderer.ACTIVE` (sowohl
+`net.irisshaders.iris.shadows.ShadowRenderer` für Iris/NeOculus als auch das alte
+`net.coderbot.iris.pipeline.ShadowRenderer` für Oculus). Keine Build-Abhängigkeit zu Iris; fehlt die
+Klasse, greift der Guard einfach nicht und es bleibt beim alten Verhalten. `replacesFoil`, `render`
+und `wrapCustomRenderer` brechen ab, solange der Shadow-Pass läuft. Haupt-Pass und First-Person-Hand
+sind unverändert, die Effekte bleiben also mit Shaderpack sichtbar.
+
+**Verifikation:** `gradlew build` grün. Dritte Person im Client mit Shaderpack am 2026-11-12 bestätigt.
+Die Egoperspektive war ein eigener Fehler – siehe KI-16.
+
+**Restrisiko:** Das Flag ist ein Implementierungsdetail von Iris und kann in einer künftigen Version
+umbenannt oder verschoben werden. Dann fällt das Feature still auf das alte, fehlerhafte Verhalten
+zurück (kein Crash). Bei erneutem Auftreten zuerst prüfen, ob `ShadowRenderer.ACTIVE` noch existiert.
+
+---
+
+## KI-15 – Effekte umgehen das Shaderpack-Post-Processing
+
+**Schwere:** Doku · **Status:** offen
+
+**Ort:** `client/UpgradeGlowEvents.java` / `GameRendererMixin` (`AFTER_LEVEL` → `composite()`)
+
+**Verhalten:** Iris ruft sein `finalizeLevelRendering` (Final-Composite inkl. eigener Blur-, Bloom- und
+Tonemapping-Pässe) **vor** dem NeoForge-Event `AFTER_LEVEL` auf. `composite()` läuft damit erst
+danach und wird von der Shaderpack-Kette nicht mehr erfasst: Halo, weite Aura und Hand-Mist werden
+roh auf den fertigen Frame addiert.
+
+**Folgen:**
+
+- Shaderpack-Effekte (Bloom, Farbkorrektur, Nebel, Wassercaustics, Tonemapping) wirken nicht auf die
+  Upgrade-Effekte. Sie können dadurch deutlich „flacher“ oder farblich daneben wirken als vanilla.
+- Das Glühen kann über Wasser-/Nebelkulissen liegen, wo es eigentlich dahinter gehören würde.
+- Der Depth-Test bleibt korrekt: Iris nutzt für sein Gbuffer denselben Depth-Texture wie das
+  Haupt-Target. `copyDepthFrom(main)` liefert also weiterhin gültige Werte, Verdeckung durch
+  Weltgeometrie funktioniert.
+- Umgekehrt gilt dasselbe ohne Shaderpack für Vanilla-Post-Effekte (siehe KI-6).
+
+**Optionen:**
+
+1. **Akzeptieren und dokumentieren.** Kein Aufwand, kein Kompatibilitätsrisiko. Effekte sind sichtbar,
+   nur nicht vom Shaderpack „eingefärbt“.
+2. **Früher compositen**, z. B. direkt nach dem Hand-Flush statt am Frame-Ende. Löst nur den
+   Hand-Teil und verschiebt das Problem (Halo läge dann unter den Screen-Effekten, siehe KI-6).
+3. **In die Iris-Pipeline einhaken** (eigener Pass vor dem Final-Composite). Liefert das beste Bild,
+   ist aber versionsfragil und widerspricht dem bisherigen Ansatz, Iris nicht als Abhängigkeit zu
+   führen. Größerer Eingriff — laut `AGENTS.md` vorher abstimmen.
+
+**Zu tun:** Entscheidung steht aus. Vorher im Client mit Shaderpack vergleichen, wie störend es
+tatsächlich ist.
+
+---
+
+## KI-16 – Shaderpack: keine Effekte in der First Person (behoben)
+
+**Schwere:** Hoch · **Status:** behoben am 2026-11-12
+
+**Ort:** `client/UpgradeGlowRenderer.java` (`phaseTypesFor`, `captureDeferredHandState`, `markRecorded`,
+`flushWorld`, `renderHandAura`)
+
+**Symptom:** Nach dem Fix von KI-14 war die dritte Person korrekt, in der Egoperspektive aber **gar
+nichts** mehr zu sehen: kein Glint, kein Halo, keine Blitze, keine Aura.
+
+**Ursache:** Ein Shaderpack rendert die Hand nicht über `GameRenderer.renderItemInHand`, sondern
+**innerhalb des Level-Passes**: `MixinLevelRenderer.iris$beginTranslucents` ruft
+`HandRenderer.renderSolid`, `iris$endLevelRender` ruft `renderTranslucent`; der Vanilla-Aufruf in
+`ItemInHandRenderer` wird per `MixinGameRenderer` abgeschaltet. Daraus folgen zwei Probleme:
+
+1. Zu dem Zeitpunkt ist unsere Phase noch `WORLD`. `phaseTypesFor` akzeptierte `FIRST_PERSON_*` aber
+   nur in `Phase.HAND` → es wurde nichts aufgezeichnet, und der spätere `flushHand()` lief leer.
+2. Selbst mit Aufzeichnung wäre ein Flush direkt nach der Hand falsch: `finalizeLevelRendering`
+   (Iris-Composite) läuft erst danach und überschreibt den Frame. Das Material muss also bis nach dem
+   Level warten – und zwar mit **den Matrizen des Hand-Passes**, denn `HandRenderer` setzt eine eigene
+   Projektion (`0.125 * handProjection`) und eine eigene Modelview (Bob, ohne inverse Kamerarotation).
+
+**Fix:**
+
+- `phaseTypesFor` behandelt `FIRST_PERSON_*` auch in `Phase.WORLD` als Handgeometrie. Das kann in
+  Vanilla nicht auftreten, dort rendert die Hand erst nach dem Level.
+- Beim ersten Zugriff kopiert `captureDeferredHandState()` Modelview und Projektion des Passes;
+  `markRecorded(level, hand)` merkt sich getrennt, dass Handgeometrie aus dem Level-Pass stammt.
+- `flushWorld` zeichnet nach dem Welt-Flush zusätzlich die Handpuffer mit diesen Matrizen – also nach
+  dem Iris-Composite, im `AFTER_LEVEL`-Event.
+- `renderHandAura` bildet in diesem Fall die Bildschirmachsen über die gespeicherte Modelview ab
+  (`M^-1 * X/Y`), weil der Hand-Pass ohne inverse Kamerarotation arbeitet. Der Vanilla-Pfad behält die
+  Weltkamera-Achsen.
+
+**Verifikation:** `gradlew build` grün. Visueller Test mit Shaderpack in der Egoperspektive offen.
+
+**Restrisiko:** Der Fix hängt an der Reihenfolge „Iris-Composite vor `AFTER_LEVEL`“ (verifiziert für
+Iris 1.8.14) und daran, dass der Hand-Pass im Level-Pass bleibt. Ändert eine künftige Iris-Version
+das, fehlen die Effekte in der Egoperspektive wieder – ohne Crash.
+
+---
+
 ## Bereits geprüft – kein Issue
 
 Damit das in der nächsten Session nicht erneut untersucht wird:
@@ -307,9 +426,14 @@ Dann in die dritte Person (F5) und:
 Vergleichswerte: `5`, `15`, `20`, `30` (weite Aura ab 5, Griff-Blitze ab 15, Klingen-Blitze ab 20).
 Bei Problemen im Log nach `Failed to load upgrade glow post chain` suchen.
 
+Zweiter Durchlauf **mit Shaderpack** (KI-14): prüfen, dass die Effekte am Item bleiben und nicht als
+losgelöste Geometrie in der Luft hängen. Sinnvoll sind ein Pack mit Shadow-Map (die meisten) und
+zusätzlich die Egoperspektive, weil der Hand-Flush einen anderen Pfad nimmt.
+
 ## Empfohlene Reihenfolge in der nächsten Session
 
-1. Visueller Test im Client (siehe oben) – entscheidet, ob KI-1/KI-2 überhaupt relevant sind.
+1. Visueller Test im Client (siehe oben) – inkl. Durchlauf mit Shaderpack (bestätigt KI-14/KI-16 und
+   entscheidet, ob KI-15 störend ist). Er entscheidet außerdem, ob KI-1/KI-2 überhaupt relevant sind.
 2. KI-3 (Einzeiler) und KI-5 (Einzeiler) direkt mitnehmen.
 3. KI-1 entscheiden (Design) – danach ggf. KI-2 messen.
 4. KI-12 (Vault-Note) nachziehen, wenn die Balance-Werte bestätigt sind.

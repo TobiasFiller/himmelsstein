@@ -22,6 +22,21 @@ public abstract class ItemStackMixin {
         }
     }
 
+    /**
+     * Hides the vanilla enchantment glint on upgraded items so only the coloured upgrade glint is
+     * visible.
+     *
+     * <p>Done on {@code ItemStack.hasFoil()} instead of inside {@code ItemRenderer.render}: item
+     * models that implement Fabric's {@code FabricBakedModel} are drawn by Sodium's FRAPI renderer,
+     * which decides the glint from this method too and never runs the vanilla render body.</p>
+     */
+    @Inject(method = "hasFoil", at = @At("HEAD"), cancellable = true)
+    private void himmelsstein$hideVanillaGlint(CallbackInfoReturnable<Boolean> callback) {
+        if (UpgradeHelper.getLevel((ItemStack) (Object) this) > 0) {
+            callback.setReturnValue(false);
+        }
+    }
+
     @Inject(method = "applyComponents(Lnet/minecraft/core/component/DataComponentMap;)V", at = @At("TAIL"))
     private void himmelsstein$clampUpgradeLevel(DataComponentMap components, CallbackInfo callback) {
         // Values outside 0-30 are clamped on load instead of letting the item codec fail.

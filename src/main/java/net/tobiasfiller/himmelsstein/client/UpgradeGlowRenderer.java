@@ -49,7 +49,9 @@ import net.tobiasfiller.himmelsstein.core.utility.UpgradeHelper;
  * <p>Glint and lightning are drawn onto the screen. Halo and wide light are flat colour silhouettes
  * in two offscreen targets that a post chain blurs and adds onto the screen at the end of the frame.
  * World items (third person, other players, mobs) are collected during the level pass and flushed
- * after it, depth-tested against the world; first-person items are flushed right after the hands.</p>
+ * after it, depth-tested against the world; first-person items are flushed right after the hands.
+ * Shader packs draw the hand inside the level pass, so there its geometry is kept back until after
+ * the level as well and flushed with the matrices of that hand pass.</p>
  *
  * <p>Baked item models are re-emitted from their quads. Items with a custom renderer (trident,
  * modded weapons) are captured while they draw: their vertices are mirrored into the effect buffers.</p>
@@ -117,6 +119,12 @@ public final class UpgradeGlowRenderer {
 
     private static Phase phase = Phase.NONE;
     private static boolean worldRecorded;
+    // Iris draws the first-person hand from inside the level pass, before the level is composited.
+    // Everything recorded there has to be kept back and flushed with the matrices of that pass.
+    private static boolean deferredHandCaptured;
+    private static boolean deferredHandRecorded;
+    private static final Matrix4f DEFERRED_HAND_MODELVIEW = new Matrix4f();
+    private static final Matrix4f DEFERRED_HAND_PROJECTION = new Matrix4f();
     private static boolean frameDirty;
     private static boolean targetsNeedClear;
     private static int maxLevelThisFrame;
@@ -152,6 +160,8 @@ public final class UpgradeGlowRenderer {
     public static void beginFrame() {
         phase = Phase.NONE;
         worldRecorded = false;
+        deferredHandCaptured = false;
+        deferredHandRecorded = false;
         frameDirty = false;
         maxLevelThisFrame = 0;
         activeCapture = null;
@@ -174,25 +184,40 @@ public final class UpgradeGlowRenderer {
             return;
         }
         phase = Phase.NONE;
-        if (!worldRecorded) {
-            return;
-        }
-        RenderTarget main = Minecraft.getInstance().getMainRenderTarget();
-        glowTarget().copyDepthFrom(main);
-        wideTarget().copyDepthFrom(main);
-        mistTarget().copyDepthFrom(main);
-        main.bindWrite(false);
 
+        if (worldRecorded) {
+            RenderTarget main = Minecraft.getInstance().getMainRenderTarget();
+            glowTarget().copyDepthFrom(main);
+            wideTarget().copyDepthFrom(main);
+            mistTarget().copyDepthFrom(main);
+            main.bindWrite(false);
+
+            applyMatrices(modelViewMatrix, projectionMatrix);
+            BUFFERS.flush(false);
+            restoreMatrices();
+        }
+
+        // The hand of a shader pack was drawn inside the level pass; its geometry is in the hand's
+        // own space, so it needs that pass's matrices instead of the world ones.
+        if (deferredHandRecorded) {
+            Minecraft.getInstance().getMainRenderTarget().bindWrite(false);
+            applyMatrices(DEFERRED_HAND_MODELVIEW, DEFERRED_HAND_PROJECTION);
+            BUFFERS.flush(true);
+            restoreMatrices();
+        }
+    }
+
+    private static void applyMatrices(Matrix4f modelViewMatrix, Matrix4f projectionMatrix) {
         RenderSystem.backupProjectionMatrix();
         RenderSystem.setProjectionMatrix(projectionMatrix, VertexSorting.DISTANCE_TO_ORIGIN);
         Matrix4fStack modelView = RenderSystem.getModelViewStack();
         modelView.pushMatrix();
         modelView.mul(modelViewMatrix);
         RenderSystem.applyModelViewMatrix();
+    }
 
-        BUFFERS.flush(false);
-
-        modelView.popMatrix();
+    private static void restoreMatrices() {
+        RenderSystem.getModelViewStack().popMatrix();
         RenderSystem.applyModelViewMatrix();
         RenderSystem.restoreProjectionMatrix();
     }
@@ -247,16 +272,30 @@ public final class UpgradeGlowRenderer {
 
     // ---------------------------------------------------------------- baked item models
 
-    /** Whether the upgrade glint replaces the vanilla enchantment glint for this render call. */
-    public static boolean replacesFoil(ItemStack stack, ItemDisplayContext context) {
-        return (context == ItemDisplayContext.GUI || phaseTypesFor(context) != null)
-                && UpgradeHelper.isUpgradable(stack) && UpgradeHelper.getLevel(stack) > 0;
+    /**
+     * Cheap gate used by the item renderer hook before it builds the transformed pose: only
+     * upgraded, non-custom-rendered items in a context that has effects can produce geometry.
+     */
+    public static boolean hasEffects(ItemStack stack, ItemDisplayContext context, BakedModel model) {
+        if (model.isCustomRenderer() || !UpgradeHelper.isUpgradable(stack) || UpgradeHelper.getLevel(stack) <= 0) {
+            return false;
+        }
+        return context == ItemDisplayContext.GUI
+                || context == ItemDisplayContext.FIRST_PERSON_LEFT_HAND
+                || context == ItemDisplayContext.FIRST_PERSON_RIGHT_HAND
+                || context == ItemDisplayContext.THIRD_PERSON_LEFT_HAND
+                || context == ItemDisplayContext.THIRD_PERSON_RIGHT_HAND;
     }
 
     public static void render(ItemStack stack, ItemDisplayContext context, PoseStack poseStack, BakedModel model,
             MultiBufferSource bufferSource) {
         if (context == ItemDisplayContext.GUI) {
             renderGui(stack, poseStack, model, bufferSource);
+            return;
+        }
+        // Iris/Oculus render held items a second time for the shadow map, with the shadow camera in
+        // the pose. Recording that geometry would flush it later with the main camera matrices.
+        if (IrisCompat.isShadowPass()) {
             return;
         }
         UpgradeRenderTypes.PhaseTypes types = phaseTypesFor(context);
@@ -289,15 +328,17 @@ public final class UpgradeGlowRenderer {
             }
         }
 
+        boolean deferredHandSpace = hand && phase == Phase.WORLD;
         if (UpgradeGlow.hasHandAura(level)) {
-            renderHandAura(types, pose, effect, hand, category == UpgradeHelper.Category.PROJECTILE);
+            renderHandAura(types, pose, effect, hand, category == UpgradeHelper.Category.PROJECTILE,
+                    deferredHandSpace);
         }
 
         if (effect.lightning()) {
             renderLightning(types, pose, effect, melee ? UpgradeLightning.Frame.MELEE
                     : UpgradeLightning.Frame.PROJECTILE, outline == null ? List.of() : outline, stack);
         }
-        markRecorded(level);
+        markRecorded(level, hand);
     }
 
     /**
@@ -381,18 +422,18 @@ public final class UpgradeGlowRenderer {
      * towards the camera and drawn into the mist target, which the post chain blurs and adds on top.
      */
     private static void renderHandAura(UpgradeRenderTypes.PhaseTypes types, PoseStack.Pose pose, Effect effect,
-            boolean hand, boolean middleAnchor) {
+            boolean hand, boolean middleAnchor, boolean deferredHandSpace) {
         float progress = UpgradeGlow.handAuraProgress(effect.level());
         float size = (1.2F + 1.0F * progress) / 3.0F;
         Vector3f anchor = middleAnchor ? MIDDLE_ANCHOR : GRIP_ANCHOR;
         Vector3f center = pose.pose().transformPosition(new Vector3f(anchor));
         Vector3f unit = pose.pose().transformPosition(new Vector3f(anchor.x + 1.0F, anchor.y, anchor.z)).sub(center);
         float half = Math.max(0.05F, unit.length() * size * 0.5F);
-        renderHandAura(types, center, half, effect, hand);
+        renderHandAura(types, center, half, effect, hand, deferredHandSpace);
     }
 
     private static void renderHandAura(UpgradeRenderTypes.PhaseTypes types, Vector3f center, float half,
-            Effect effect, boolean hand) {
+            Effect effect, boolean hand, boolean deferredHandSpace) {
         float progress = UpgradeGlow.handAuraProgress(effect.level());
         float brightness = effect.glowBrightness() * (0.55F + 0.45F * progress) * 2.0F;
         int color = FastColor.ARGB32.color(255, Math.round(effect.red() * brightness * 255.0F),
@@ -400,11 +441,24 @@ public final class UpgradeGlowRenderer {
                 Math.round(effect.blue() * brightness * 255.0F));
 
         // Both phases write into a pose space that the shader rotates by the camera view. The
-        // first-person pose is pre-multiplied by the inverse camera rotation, so the world-space
-        // camera axes are the correct billboard axes in both cases.
-        Camera camera = Minecraft.getInstance().gameRenderer.getMainCamera();
-        Vector3f right = new Vector3f(camera.getLeftVector()).negate();
-        Vector3f up = new Vector3f(camera.getUpVector());
+        // first-person pose of the vanilla renderer is pre-multiplied by the inverse camera
+        // rotation, so the world-space camera axes are the correct billboard axes there.
+        Vector3f right = new Vector3f();
+        Vector3f up = new Vector3f();
+        if (deferredHandSpace) {
+            // A shader pack renders the hand without that inverse rotation, so its space is screen
+            // aligned already: the billboard axes are the ones that the recorded pose maps onto the
+            // screen axes.
+            Matrix4f inverse = new Matrix4f(DEFERRED_HAND_MODELVIEW).invert();
+            right.set(1.0F, 0.0F, 0.0F);
+            up.set(0.0F, 1.0F, 0.0F);
+            inverse.transformDirection(right);
+            inverse.transformDirection(up);
+        } else {
+            Camera camera = Minecraft.getInstance().gameRenderer.getMainCamera();
+            right.set(camera.getLeftVector()).negate();
+            up.set(camera.getUpVector());
+        }
 
         VertexConsumer mist = BUFFERS.get(types.mist(), hand, UpgradeEffectBuffers.SILHOUETTE);
         long millis = effect.millis();
@@ -458,6 +512,9 @@ public final class UpgradeGlowRenderer {
     public static MultiBufferSource wrapCustomRenderer(ItemStack stack, ItemDisplayContext context,
             PoseStack poseStack, MultiBufferSource original) {
         activeCapture = null;
+        if (IrisCompat.isShadowPass()) {
+            return original;
+        }
         UpgradeRenderTypes.PhaseTypes types = phaseTypesFor(context);
         int level = UpgradeHelper.getLevel(stack);
         if (types == null || !UpgradeHelper.isUpgradable(stack) || level <= 0) {
@@ -487,7 +544,7 @@ public final class UpgradeGlowRenderer {
                         capture.stack);
             }
         }
-        markRecorded(capture.effect.level());
+        markRecorded(capture.effect.level(), capture.types.hand());
     }
 
     /** Mist anchored at the centre of the geometry a custom renderer produced. */
@@ -507,7 +564,7 @@ public final class UpgradeGlowRenderer {
         // The trident model is much larger than a sword, so its aura needs a smaller factor.
         float sizeFactor = capture.stack.is(Items.TRIDENT) ? 0.5F : 1.0F;
         renderHandAura(capture.types, center, Math.max(0.05F, radius * 1.6F / 3.0F * sizeFactor), capture.effect,
-                capture.types.hand());
+                capture.types.hand(), capture.types.hand() && phase == Phase.WORLD);
     }
 
     /** Buffer source that mirrors entity-format geometry into the glow, wide and glint buffers. */
@@ -681,9 +738,13 @@ public final class UpgradeGlowRenderer {
                 frame, outline, System.identityHashCode(stack), effect.millis());
     }
 
-    private static void markRecorded(int level) {
+    private static void markRecorded(int level, boolean hand) {
         if (phase == Phase.WORLD) {
-            worldRecorded = true;
+            if (hand) {
+                deferredHandRecorded = true;
+            } else {
+                worldRecorded = true;
+            }
         }
         frameDirty = true;
         maxLevelThisFrame = Math.max(maxLevelThisFrame, level);
@@ -694,11 +755,27 @@ public final class UpgradeGlowRenderer {
                 || context == ItemDisplayContext.THIRD_PERSON_RIGHT_HAND)) {
             return UpgradeRenderTypes.WORLD;
         }
-        if (phase == Phase.HAND && (context == ItemDisplayContext.FIRST_PERSON_LEFT_HAND
+        if ((phase == Phase.HAND || phase == Phase.WORLD) && (context == ItemDisplayContext.FIRST_PERSON_LEFT_HAND
                 || context == ItemDisplayContext.FIRST_PERSON_RIGHT_HAND)) {
+            // A shader pack draws the first-person hand from inside the level pass, while the world
+            // phase is still active, so that geometry is recorded as hand geometry but cannot be
+            // flushed right away: the pack composites the level afterwards and would overwrite it.
+            if (phase == Phase.WORLD) {
+                captureDeferredHandState();
+            }
             return UpgradeRenderTypes.HAND;
         }
         return null;
+    }
+
+    /** Remembers the projection and pose of the hand pass a shader pack draws inside the level. */
+    private static void captureDeferredHandState() {
+        if (deferredHandCaptured) {
+            return;
+        }
+        DEFERRED_HAND_MODELVIEW.set(RenderSystem.getModelViewMatrix());
+        DEFERRED_HAND_PROJECTION.set(RenderSystem.getProjectionMatrix());
+        deferredHandCaptured = true;
     }
 
     private static boolean ensurePostChain() {
