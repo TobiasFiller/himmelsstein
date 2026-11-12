@@ -33,18 +33,22 @@ public final class UpgradeRenderTypes {
             ResourceLocation.fromNamespaceAndPath(Himmelsstein.MODID, "upgrade_glint");
     private static final ResourceLocation GLINT_TEXTURE =
             ResourceLocation.fromNamespaceAndPath(Himmelsstein.MODID, "textures/misc/upgrade_glint_item.png");
+    private static final ResourceLocation MIST_TEXTURE =
+            ResourceLocation.fromNamespaceAndPath(Himmelsstein.MODID, "textures/misc/upgrade_mist.png");
 
     // Item sprites cover a tiny part of the block atlas, entity textures span the whole UV range,
     // so custom models need a much smaller glint scale for the same vein size.
     private static final float ATLAS_GLINT_SCALE = 8.0F;
     private static final float CUSTOM_GLINT_SCALE = 0.5F;
+    // GUI icons are only 16x16 pixels; a coarser pattern stays readable instead of turning into noise.
+    private static final float GUI_GLINT_SCALE = 4.0F;
 
     private static ShaderInstance glowShader;
     private static ShaderInstance glintShader;
 
     /** Render types for baked item models (block atlas) within one phase. */
-    public record PhaseTypes(boolean hand, RenderType glow, RenderType wide, RenderType boltGlow, RenderType glint,
-            RenderType bolt) {}
+    public record PhaseTypes(boolean hand, RenderType glow, RenderType wide, RenderType mist, RenderType boltGlow,
+            RenderType glint, RenderType bolt) {}
 
     /** Render types for geometry of custom item renderers that use their own texture. */
     public record TexturedTypes(RenderType glow, RenderType wide, RenderType glint) {}
@@ -67,6 +71,13 @@ public final class UpgradeRenderTypes {
 
     public static final PhaseTypes WORLD = createPhase(false);
     public static final PhaseTypes HAND = createPhase(true);
+
+    /**
+     * Glint for item icons in GUIs. Drawn through the GUI buffer source, so it is flushed together
+     * with the item and stays below later GUI layers (tooltips, dragged stack).
+     */
+    public static final RenderType GUI_GLINT = glint("glint_gui", InventoryMenu.BLOCK_ATLAS, GUI_GLINT_SCALE,
+            RenderStateShard.NO_DEPTH_TEST);
 
     private static final Map<ResourceLocation, TexturedTypes> WORLD_TEXTURED = new HashMap<>();
     private static final Map<ResourceLocation, TexturedTypes> HAND_TEXTURED = new HashMap<>();
@@ -92,7 +103,7 @@ public final class UpgradeRenderTypes {
             return new TexturedTypes(
                     silhouette("glow_" + suffix, key, offscreenDepth(hand), glowOutput(hand)),
                     silhouette("wide_" + suffix, key, offscreenDepth(hand), wideOutput(hand)),
-                    glint("glint_" + suffix, key, CUSTOM_GLINT_SCALE));
+                    glint("glint_" + suffix, key, CUSTOM_GLINT_SCALE, RenderStateShard.LEQUAL_DEPTH_TEST));
         });
     }
 
@@ -137,9 +148,26 @@ public final class UpgradeRenderTypes {
         return new PhaseTypes(hand,
                 silhouette("glow_" + phase, InventoryMenu.BLOCK_ATLAS, offscreenDepth(hand), glowOutput(hand)),
                 silhouette("wide_" + phase, InventoryMenu.BLOCK_ATLAS, offscreenDepth(hand), wideOutput(hand)),
+                mist(phase, hand),
                 boltGlow,
-                glint("glint_" + phase, InventoryMenu.BLOCK_ATLAS, ATLAS_GLINT_SCALE),
+                glint("glint_" + phase, InventoryMenu.BLOCK_ATLAS, ATLAS_GLINT_SCALE,
+                        RenderStateShard.LEQUAL_DEPTH_TEST),
                 bolt);
+    }
+
+    /** Soft cloud quads for the misty hand aura, blurred by the post chain. */
+    private static RenderType mist(String phase, boolean hand) {
+        return RenderType.create(name("mist_" + phase), DefaultVertexFormat.NEW_ENTITY, VertexFormat.Mode.QUADS,
+                1536, false, false,
+                RenderType.CompositeState.builder()
+                        .setShaderState(GLOW_SHADER_STATE)
+                        .setTextureState(new RenderStateShard.TextureStateShard(MIST_TEXTURE, true, false))
+                        .setTransparencyState(RenderStateShard.NO_TRANSPARENCY)
+                        .setDepthTestState(offscreenDepth(hand))
+                        .setCullState(RenderStateShard.NO_CULL)
+                        .setWriteMaskState(RenderStateShard.COLOR_WRITE)
+                        .setOutputState(mistOutput(hand))
+                        .createCompositeState(false));
     }
 
     /** World glow is tested against the copied world depth; first-person glow is never occluded. */
@@ -153,6 +181,10 @@ public final class UpgradeRenderTypes {
 
     private static RenderStateShard.OutputStateShard wideOutput(boolean hand) {
         return output("wide_" + (hand ? "hand" : "world"), UpgradeGlowRenderer::wideTarget);
+    }
+
+    private static RenderStateShard.OutputStateShard mistOutput(boolean hand) {
+        return output("mist_" + (hand ? "hand" : "world"), UpgradeGlowRenderer::mistTarget);
     }
 
     private static RenderType silhouette(String suffix, ResourceLocation texture,
@@ -170,7 +202,8 @@ public final class UpgradeRenderTypes {
                         .createCompositeState(false));
     }
 
-    private static RenderType glint(String suffix, ResourceLocation texture, float scale) {
+    private static RenderType glint(String suffix, ResourceLocation texture, float scale,
+            RenderStateShard.DepthTestStateShard depthTest) {
         // Two overlaid glint layers, running against the vanilla glint direction at different angles.
         RenderStateShard.TexturingStateShard texturing = new RenderStateShard.TexturingStateShard(
                 name(suffix + "_texturing"), () -> setupGlintTexturing(scale), () -> {});
@@ -184,7 +217,7 @@ public final class UpgradeRenderTypes {
                                 .build())
                         .setTexturingState(texturing)
                         .setTransparencyState(ADDITIVE)
-                        .setDepthTestState(RenderStateShard.LEQUAL_DEPTH_TEST)
+                        .setDepthTestState(depthTest)
                         .setCullState(RenderStateShard.NO_CULL)
                         .setWriteMaskState(RenderStateShard.COLOR_WRITE)
                         .createCompositeState(false));

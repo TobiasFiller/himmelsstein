@@ -8,8 +8,10 @@ package net.tobiasfiller.himmelsstein.core.utility;
 public final class UpgradeGlow {
     public static final int LEVELS_PER_BAND = 5;
 
-    /** Wide outward light from +5, lightning around the handle from +15, along the blade from +20. */
+    /** Wide outward light from +5, misty hand aura from +10 (peaks at +20), lightning from +15 / +20. */
     public static final int WIDE_AURA_LEVEL = 5;
+    public static final int HAND_AURA_LEVEL = 10;
+    public static final int HAND_AURA_PEAK_LEVEL = 20;
     public static final int HANDLE_LIGHTNING_LEVEL = 15;
     public static final int BLADE_LIGHTNING_LEVEL = 20;
 
@@ -65,6 +67,25 @@ public final class UpgradeGlow {
 
     public static boolean hasWideAura(int level) {
         return UpgradeHelper.clampLevel(level) >= WIDE_AURA_LEVEL;
+    }
+
+    public static boolean hasHandAura(int level) {
+        return UpgradeHelper.clampLevel(level) >= HAND_AURA_LEVEL;
+    }
+
+    /**
+     * Linear 0..1 position of the level between +10 and +20, used for the hand aura size and
+     * brightness. Stays at 1.0 from +20 to +30 so the aura does not keep growing.
+     */
+    public static float handAuraProgress(int level) {
+        int clamped = UpgradeHelper.clampLevel(level);
+        if (clamped <= HAND_AURA_LEVEL) {
+            return 0.0F;
+        }
+        if (clamped >= HAND_AURA_PEAK_LEVEL) {
+            return 1.0F;
+        }
+        return (clamped - HAND_AURA_LEVEL) / (float) (HAND_AURA_PEAK_LEVEL - HAND_AURA_LEVEL);
     }
 
     public static boolean hasHandleLightning(int level) {

@@ -38,7 +38,7 @@ public abstract class ItemRendererMixin {
     private void himmelsstein$renderUpgradeGlow(ItemStack stack, ItemDisplayContext context, boolean leftHand,
             PoseStack poseStack, MultiBufferSource bufferSource, int light, int overlay, BakedModel model,
             CallbackInfo callback) {
-        UpgradeGlowRenderer.render(stack, context, poseStack, model);
+        UpgradeGlowRenderer.render(stack, context, poseStack, model, bufferSource);
     }
 
     // Custom item renderers (trident, modded weapons): their geometry is captured while they draw.

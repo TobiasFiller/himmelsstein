@@ -22,6 +22,7 @@ import com.mojang.blaze3d.vertex.VertexMultiConsumer;
 import com.mojang.blaze3d.vertex.VertexSorting;
 
 import net.minecraft.Util;
+import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -36,6 +37,7 @@ import net.minecraft.util.FastColor;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.neoforged.neoforge.client.model.data.ModelData;
 import net.tobiasfiller.himmelsstein.Himmelsstein;
 import net.tobiasfiller.himmelsstein.core.utility.UpgradeGlow;
@@ -57,6 +59,8 @@ public final class UpgradeGlowRenderer {
             ResourceLocation.fromNamespaceAndPath(Himmelsstein.MODID, "shaders/post/upgrade_glow.json");
     private static final String GLOW_TARGET = "glow";
     private static final String WIDE_TARGET = "wide";
+    private static final String MIST_TARGET = "mist";
+    private static final String MIST_RESULT = "swap";
     private static final String HALO_RESULT = "halo";
 
     // Halo width in pixels at 1080p for +1 and +30, scaled with the window height. The wide
@@ -139,6 +143,10 @@ public final class UpgradeGlowRenderer {
         return postChain == null ? null : postChain.getTempTarget(WIDE_TARGET);
     }
 
+    static RenderTarget mistTarget() {
+        return postChain == null ? null : postChain.getTempTarget(MIST_TARGET);
+    }
+
     // ---------------------------------------------------------------- frame lifecycle
 
     public static void beginFrame() {
@@ -153,6 +161,7 @@ public final class UpgradeGlowRenderer {
         if (targetsNeedClear) {
             glowTarget().clear(Minecraft.ON_OSX);
             wideTarget().clear(Minecraft.ON_OSX);
+            mistTarget().clear(Minecraft.ON_OSX);
             Minecraft.getInstance().getMainRenderTarget().bindWrite(false);
             targetsNeedClear = false;
         }
@@ -171,6 +180,7 @@ public final class UpgradeGlowRenderer {
         RenderTarget main = Minecraft.getInstance().getMainRenderTarget();
         glowTarget().copyDepthFrom(main);
         wideTarget().copyDepthFrom(main);
+        mistTarget().copyDepthFrom(main);
         main.bindWrite(false);
 
         RenderSystem.backupProjectionMatrix();
@@ -224,6 +234,10 @@ public final class UpgradeGlowRenderer {
         if (UpgradeGlow.hasWideAura(maxLevelThisFrame)) {
             wideTarget().blitToScreen(width, height, false);
         }
+        if (UpgradeGlow.hasHandAura(maxLevelThisFrame)) {
+            // The mask pass writes the item-occluded mist into the swap target.
+            postChain.getTempTarget(MIST_RESULT).blitToScreen(width, height, false);
+        }
         RenderSystem.defaultBlendFunc();
         RenderSystem.disableBlend();
         main.bindWrite(true);
@@ -235,10 +249,16 @@ public final class UpgradeGlowRenderer {
 
     /** Whether the upgrade glint replaces the vanilla enchantment glint for this render call. */
     public static boolean replacesFoil(ItemStack stack, ItemDisplayContext context) {
-        return phaseTypesFor(context) != null && UpgradeHelper.isUpgradable(stack) && UpgradeHelper.getLevel(stack) > 0;
+        return (context == ItemDisplayContext.GUI || phaseTypesFor(context) != null)
+                && UpgradeHelper.isUpgradable(stack) && UpgradeHelper.getLevel(stack) > 0;
     }
 
-    public static void render(ItemStack stack, ItemDisplayContext context, PoseStack poseStack, BakedModel model) {
+    public static void render(ItemStack stack, ItemDisplayContext context, PoseStack poseStack, BakedModel model,
+            MultiBufferSource bufferSource) {
+        if (context == ItemDisplayContext.GUI) {
+            renderGui(stack, poseStack, model, bufferSource);
+            return;
+        }
         UpgradeRenderTypes.PhaseTypes types = phaseTypesFor(context);
         if (types == null || model.isCustomRenderer()) {
             return;
@@ -269,11 +289,48 @@ public final class UpgradeGlowRenderer {
             }
         }
 
+        if (UpgradeGlow.hasHandAura(level)) {
+            renderHandAura(types, pose, effect, hand, category == UpgradeHelper.Category.PROJECTILE);
+        }
+
         if (effect.lightning()) {
             renderLightning(types, pose, effect, melee ? UpgradeLightning.Frame.MELEE
                     : UpgradeLightning.Frame.PROJECTILE, outline == null ? List.of() : outline, stack);
         }
         markRecorded(level);
+    }
+
+    /**
+     * Glint on an item icon in a GUI. It is written into the GUI's own buffer source, so it is
+     * flushed together with the item and stays below later GUI layers (tooltips, dragged stack).
+     */
+    private static void renderGui(ItemStack stack, PoseStack poseStack, BakedModel model,
+            MultiBufferSource bufferSource) {
+        if (model.isCustomRenderer()) {
+            return;
+        }
+        int level = UpgradeHelper.getLevel(stack);
+        if (UpgradeHelper.getCategory(stack) == UpgradeHelper.Category.NONE || level <= 0) {
+            return;
+        }
+        Effect effect = Effect.of(level);
+        float scale = effect.glintBrightness();
+        float red = effect.red() * scale;
+        float green = effect.green() * scale;
+        float blue = effect.blue() * scale;
+
+        VertexConsumer glint = bufferSource.getBuffer(UpgradeRenderTypes.GUI_GLINT);
+        PoseStack.Pose pose = poseStack.last();
+        for (BakedModel pass : model.getRenderPasses(stack, true)) {
+            for (Direction direction : Direction.values()) {
+                for (BakedQuad quad : quads(pass, direction)) {
+                    put(glint, pose, quad, red, green, blue);
+                }
+            }
+            for (BakedQuad quad : quads(pass, null)) {
+                put(glint, pose, quad, red, green, blue);
+            }
+        }
     }
 
     private static List<BakedQuad> quads(BakedModel model, Direction direction) {
@@ -313,6 +370,85 @@ public final class UpgradeGlowRenderer {
         return center.mul(0.25F);
     }
 
+    // ---------------------------------------------------------------- misty hand aura
+
+    // Swords hold at the lower part of the model; bows/crossbows are gripped in the middle.
+    private static final Vector3f GRIP_ANCHOR = new Vector3f(0.25F, 0.25F, 0.5F);
+    private static final Vector3f MIDDLE_ANCHOR = new Vector3f(0.5F, 0.5F, 0.5F);
+
+    /**
+     * Soft, cloudy aura around the hand holding the item. Three overlapping quads are billboarded
+     * towards the camera and drawn into the mist target, which the post chain blurs and adds on top.
+     */
+    private static void renderHandAura(UpgradeRenderTypes.PhaseTypes types, PoseStack.Pose pose, Effect effect,
+            boolean hand, boolean middleAnchor) {
+        float progress = UpgradeGlow.handAuraProgress(effect.level());
+        float size = (1.2F + 1.0F * progress) / 3.0F;
+        Vector3f anchor = middleAnchor ? MIDDLE_ANCHOR : GRIP_ANCHOR;
+        Vector3f center = pose.pose().transformPosition(new Vector3f(anchor));
+        Vector3f unit = pose.pose().transformPosition(new Vector3f(anchor.x + 1.0F, anchor.y, anchor.z)).sub(center);
+        float half = Math.max(0.05F, unit.length() * size * 0.5F);
+        renderHandAura(types, center, half, effect, hand);
+    }
+
+    private static void renderHandAura(UpgradeRenderTypes.PhaseTypes types, Vector3f center, float half,
+            Effect effect, boolean hand) {
+        float progress = UpgradeGlow.handAuraProgress(effect.level());
+        float brightness = effect.glowBrightness() * (0.55F + 0.45F * progress) * 2.0F;
+        int color = FastColor.ARGB32.color(255, Math.round(effect.red() * brightness * 255.0F),
+                Math.round(effect.green() * brightness * 255.0F),
+                Math.round(effect.blue() * brightness * 255.0F));
+
+        // Both phases write into a pose space that the shader rotates by the camera view. The
+        // first-person pose is pre-multiplied by the inverse camera rotation, so the world-space
+        // camera axes are the correct billboard axes in both cases.
+        Camera camera = Minecraft.getInstance().gameRenderer.getMainCamera();
+        Vector3f right = new Vector3f(camera.getLeftVector()).negate();
+        Vector3f up = new Vector3f(camera.getUpVector());
+
+        VertexConsumer mist = BUFFERS.get(types.mist(), hand, UpgradeEffectBuffers.SILHOUETTE);
+        long millis = effect.millis();
+        for (int i = 0; i < 3; i++) {
+            float angle = (float) (millis * 0.00018D + i * Math.PI / 3.0D);
+            float scale = (0.72F + 0.18F * i) * half;
+            float cos = (float) Math.cos(angle);
+            float sin = (float) Math.sin(angle);
+
+            Vector3f r = new Vector3f(right).mul(cos);
+            r.add(new Vector3f(up).mul(sin));
+            r.mul(scale);
+            Vector3f u = new Vector3f(up).mul(cos);
+            u.sub(new Vector3f(right).mul(sin));
+            u.mul(scale);
+
+            emitMistQuad(mist, center, r, u, color);
+        }
+    }
+
+    private static void emitMistQuad(VertexConsumer consumer, Vector3f center, Vector3f r, Vector3f u, int color) {
+        float x0 = center.x - r.x - u.x;
+        float y0 = center.y - r.y - u.y;
+        float z0 = center.z - r.z - u.z;
+        float x1 = center.x + r.x - u.x;
+        float y1 = center.y + r.y - u.y;
+        float z1 = center.z + r.z - u.z;
+        float x2 = center.x + r.x + u.x;
+        float y2 = center.y + r.y + u.y;
+        float z2 = center.z + r.z + u.z;
+        float x3 = center.x - r.x + u.x;
+        float y3 = center.y - r.y + u.y;
+        float z3 = center.z - r.z + u.z;
+
+        consumer.addVertex(x0, y0, z0, color, 0.0F, 1.0F, OverlayTexture.NO_OVERLAY, LightTexture.FULL_BRIGHT,
+                0.0F, 0.0F, 1.0F);
+        consumer.addVertex(x1, y1, z1, color, 1.0F, 1.0F, OverlayTexture.NO_OVERLAY, LightTexture.FULL_BRIGHT,
+                0.0F, 0.0F, 1.0F);
+        consumer.addVertex(x2, y2, z2, color, 1.0F, 0.0F, OverlayTexture.NO_OVERLAY, LightTexture.FULL_BRIGHT,
+                0.0F, 0.0F, 1.0F);
+        consumer.addVertex(x3, y3, z3, color, 0.0F, 0.0F, OverlayTexture.NO_OVERLAY, LightTexture.FULL_BRIGHT,
+                0.0F, 0.0F, 1.0F);
+    }
+
     // ---------------------------------------------------------------- custom item renderers
 
     /**
@@ -340,6 +476,9 @@ public final class UpgradeGlowRenderer {
         if (capture == null || !capture.recorded) {
             return;
         }
+        if (UpgradeGlow.hasHandAura(capture.effect.level())) {
+            renderCapturedHandAura(capture);
+        }
         if (capture.effect.lightning()) {
             UpgradeLightning.Frame frame = UpgradeLightning.Frame.fromPoints(capture.points, capture.origin);
             if (frame != null) {
@@ -349,6 +488,26 @@ public final class UpgradeGlowRenderer {
             }
         }
         markRecorded(capture.effect.level());
+    }
+
+    /** Mist anchored at the centre of the geometry a custom renderer produced. */
+    private static void renderCapturedHandAura(CustomCapture capture) {
+        if (capture.points.isEmpty()) {
+            return;
+        }
+        Vector3f center = new Vector3f();
+        for (Vector3f point : capture.points) {
+            center.add(point);
+        }
+        center.mul(1.0F / capture.points.size());
+        float radius = 0.0F;
+        for (Vector3f point : capture.points) {
+            radius = Math.max(radius, center.distance(point));
+        }
+        // The trident model is much larger than a sword, so its aura needs a smaller factor.
+        float sizeFactor = capture.stack.is(Items.TRIDENT) ? 0.5F : 1.0F;
+        renderHandAura(capture.types, center, Math.max(0.05F, radius * 1.6F / 3.0F * sizeFactor), capture.effect,
+                capture.types.hand());
     }
 
     /** Buffer source that mirrors entity-format geometry into the glow, wide and glint buffers. */
