@@ -33,8 +33,8 @@ import net.tobiasfiller.himmelsstein.core.utility.UpgradeTableHelper;
 /**
  * Inventory and upgrade process of the upgrade table.
  *
- * <p>Slot 0 holds the stone, slot 1 the item to upgrade and slot 2 is reserved for protection
- * runes. The roll happens only on the server, either through the menu button or through
+ * <p>Slot 0 holds the stone, slot 1 the item to upgrade and slot 2 an optional protection rune.
+ * The roll happens only on the server, either through the menu button or through
  * {@link #performUpgrade(RandomSource)} (also used by the game tests).</p>
  */
 public class UpgradeTableBlockEntity extends BaseContainerBlockEntity {
@@ -77,14 +77,21 @@ public class UpgradeTableBlockEntity extends BaseContainerBlockEntity {
             return false;
         }
 
-        // Every valid attempt consumes exactly one stone, success or failure.
+        // The stone is always consumed. The rune is only consumed when it actually
+        // prevented destruction; successes and harmless failures leave it in the slot.
         stone.shrink(1);
         if (stone.isEmpty()) {
             items.set(SLOT_STONE, ItemStack.EMPTY);
         }
+        if (result.outcome() == UpgradeTableHelper.Outcome.FAIL_RUNE_PROTECT && !rune.isEmpty()) {
+            rune.shrink(1);
+            if (rune.isEmpty()) {
+                items.set(SLOT_RUNE, ItemStack.EMPTY);
+            }
+        }
 
         switch (result.outcome()) {
-            case SUCCESS, FAIL_LOSE_LEVEL -> UpgradeHelper.setLevel(item, result.newLevel());
+            case SUCCESS, FAIL_LOSE_LEVEL, FAIL_RUNE_PROTECT -> UpgradeHelper.setLevel(item, result.newLevel());
             case FAIL_KEEP -> {
                 // The item stays untouched.
             }
@@ -135,6 +142,14 @@ public class UpgradeTableBlockEntity extends BaseContainerBlockEntity {
                 if (level instanceof ServerLevel serverLevel) {
                     serverLevel.sendParticles(ParticleTypes.LARGE_SMOKE, x, y, z, 12,
                             0.2D, 0.2D, 0.2D, 0.01D);
+                }
+            }
+            case FAIL_RUNE_PROTECT -> {
+                level.playSound(null, worldPosition, SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.BLOCKS,
+                        0.9F, 1.4F);
+                if (level instanceof ServerLevel serverLevel) {
+                    serverLevel.sendParticles(ParticleTypes.ENCHANT, x, y, z, 16,
+                            0.3D, 0.3D, 0.3D, 0.05D);
                 }
             }
             default -> {

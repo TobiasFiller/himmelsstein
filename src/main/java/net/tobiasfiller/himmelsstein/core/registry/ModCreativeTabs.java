@@ -23,6 +23,10 @@ public final class ModCreativeTabs {
                         output.accept(ModItems.HEAVEN_STONE.get());
                         output.accept(ModItems.POWER_STONE.get());
                         output.accept(ModItems.LUCK_STONE.get());
+                        output.accept(ModItems.PROTECTION_RUNE.get());
+                        output.accept(ModItems.IRON_PROTECTION_RUNE.get());
+                        output.accept(ModItems.GOLDEN_PROTECTION_RUNE.get());
+                        output.accept(ModItems.DIAMOND_PROTECTION_RUNE.get());
                         output.accept(ModItems.STONE_ALTAR.get());
                         output.accept(ModItems.UPGRADE_TABLE.get());
                     })

@@ -1,0 +1,16 @@
+{
+  "replace": false,
+  "entries": [
+    "himmelsstein:protection_runes_simple_dungeon",
+    "himmelsstein:protection_runes_abandoned_mineshaft",
+    "himmelsstein:protection_runes_stronghold_library",
+    "himmelsstein:protection_runes_woodland_mansion",
+    "himmelsstein:protection_runes_ancient_city",
+    "himmelsstein:protection_runes_pillager_outpost",
+    "himmelsstein:protection_runes_nether_bridge",
+    "himmelsstein:protection_runes_bastion_treasure",
+    "himmelsstein:protection_runes_bastion_other",
+    "himmelsstein:protection_runes_ruined_portal",
+    "himmelsstein:protection_runes_end_city_treasure"
+  ]
+}

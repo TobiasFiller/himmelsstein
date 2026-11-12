@@ -17,8 +17,8 @@ public final class UpgradeTableHelper {
         NOT_UPGRADABLE,
         NO_STONE,
         NOT_A_STONE,
-        MAX_LEVEL,
-        RUNE_NOT_SUPPORTED
+        NOT_A_RUNE,
+        MAX_LEVEL
     }
 
     public enum Outcome {
@@ -26,6 +26,7 @@ public final class UpgradeTableHelper {
         FAIL_KEEP,
         FAIL_LOSE_LEVEL,
         FAIL_DESTROY,
+        FAIL_RUNE_PROTECT,
         INVALID
     }
 
@@ -49,8 +50,8 @@ public final class UpgradeTableHelper {
     /**
      * Validates the three slots and resolves the chance for the current level.
      *
-     * <p>Protection runes are not implemented yet: a rune in the third slot makes the attempt
-     * invalid instead of silently ignoring it.</p>
+     * <p>A protection rune in the third slot is optional. It never changes the success chance; it
+     * only turns a destroying failure into a level loss (see {@link #attempt}).</p>
      */
     public static Preview preview(ItemStack item, ItemStack stone, ItemStack rune) {
         if (item.isEmpty()) {
@@ -59,8 +60,8 @@ public final class UpgradeTableHelper {
         if (!UpgradeHelper.isUpgradable(item)) {
             return Preview.invalid(Reason.NOT_UPGRADABLE);
         }
-        if (!rune.isEmpty()) {
-            return Preview.invalid(Reason.RUNE_NOT_SUPPORTED);
+        if (!rune.isEmpty() && ProtectionRuneData.getData(rune) == null) {
+            return Preview.invalid(Reason.NOT_A_RUNE);
         }
         if (stone.isEmpty()) {
             return Preview.invalid(Reason.NO_STONE);
@@ -87,16 +88,28 @@ public final class UpgradeTableHelper {
             return Result.invalid();
         }
 
+        ProtectionRuneData runeData = ProtectionRuneData.getData(rune);
+
         // nextDouble() is in [0, 1), so 100 % always succeeds and 0 % always fails.
         if (random.nextDouble() * 100.0D < preview.chance()) {
-            return new Result(Outcome.SUCCESS, preview.targetLevel());
+            int gain = runeData == null ? 1 : runeData.rollSuccessGain(random);
+            int maxLevel = Math.min(UpgradeHelper.MAX_LEVEL, preview.maxLevel());
+            int newLevel = Math.min(maxLevel, preview.currentLevel() + gain);
+            return new Result(Outcome.SUCCESS, newLevel);
         }
 
         UpgradeStoneData data = UpgradeStoneData.getData(stone.getItem());
         if (data == null) {
             return Result.invalid();
         }
-        return failureResult(preview.currentLevel(), data.rollFailOutcome(preview.currentLevel(), random));
+
+        UpgradeStoneData.FailOutcomeType outcome =
+                data.rollFailOutcome(preview.currentLevel(), random);
+        if (outcome == UpgradeStoneData.FailOutcomeType.DESTROY && runeData != null) {
+            int newLevel = preview.currentLevel() - runeData.levelLoss(preview.currentLevel());
+            return new Result(Outcome.FAIL_RUNE_PROTECT, newLevel);
+        }
+        return failureResult(preview.currentLevel(), outcome);
     }
 
     /**

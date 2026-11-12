@@ -6,6 +6,7 @@ import net.minecraft.world.item.Item;
 import net.neoforged.neoforge.registries.datamaps.DataMapType;
 import net.neoforged.neoforge.registries.datamaps.RegisterDataMapTypesEvent;
 import net.tobiasfiller.himmelsstein.Himmelsstein;
+import net.tobiasfiller.himmelsstein.core.utility.ProtectionRuneData;
 import net.tobiasfiller.himmelsstein.core.utility.UpgradeStoneData;
 
 /** Registry data maps of the mod. */
@@ -23,9 +24,22 @@ public final class ModDataMaps {
             .synced(UpgradeStoneData.CODEC, false)
             .build();
 
+    /**
+     * Per-item protection rune stats, loaded from
+     * {@code data/himmelsstein/data_maps/item/protection_rune.json}.
+     *
+     * <p>Synced to clients so the tooltips can show the same values the server uses.</p>
+     */
+    public static final DataMapType<Item, ProtectionRuneData> PROTECTION_RUNE = DataMapType
+            .builder(ResourceLocation.fromNamespaceAndPath(Himmelsstein.MODID, "protection_rune"),
+                    Registries.ITEM, ProtectionRuneData.CODEC)
+            .synced(ProtectionRuneData.CODEC, false)
+            .build();
+
     private ModDataMaps() {}
 
     public static void register(RegisterDataMapTypesEvent event) {
         event.register(UPGRADE_STONE);
+        event.register(PROTECTION_RUNE);
     }
 }

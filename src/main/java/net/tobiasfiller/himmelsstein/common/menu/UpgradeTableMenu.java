@@ -181,10 +181,5 @@ public class UpgradeTableMenu extends AbstractContainerMenu {
         public boolean mayPlace(ItemStack stack) {
             return stack.is(ModTags.PROTECTION_RUNES);
         }
-
-        @Override
-        public int getMaxStackSize() {
-            return 1;
-        }
     }
 }

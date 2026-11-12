@@ -1,3 +1,8 @@
 {
-  "values": []
+  "values": [
+    "himmelsstein:protection_rune",
+    "himmelsstein:iron_protection_rune",
+    "himmelsstein:golden_protection_rune",
+    "himmelsstein:diamond_protection_rune"
+  ]
 }

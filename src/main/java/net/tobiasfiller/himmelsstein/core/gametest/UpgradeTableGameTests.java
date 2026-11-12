@@ -1,5 +1,6 @@
 package net.tobiasfiller.himmelsstein.core.gametest;
 
+import java.util.List;
 import java.util.UUID;
 
 import com.mojang.authlib.GameProfile;
@@ -21,6 +22,7 @@ import net.tobiasfiller.himmelsstein.common.blockentity.UpgradeTableBlockEntity;
 import net.tobiasfiller.himmelsstein.common.menu.UpgradeTableMenu;
 import net.tobiasfiller.himmelsstein.core.registry.ModBlocks;
 import net.tobiasfiller.himmelsstein.core.registry.ModItems;
+import net.tobiasfiller.himmelsstein.core.utility.ProtectionRuneData;
 import net.tobiasfiller.himmelsstein.core.utility.UpgradeHelper;
 import net.tobiasfiller.himmelsstein.core.utility.UpgradeStoneData;
 import net.tobiasfiller.himmelsstein.core.utility.UpgradeTableHelper;
@@ -95,6 +97,20 @@ public final class UpgradeTableGameTests {
             }
         }
         throw new IllegalStateException("No failing seed for chance " + chance + " and outcome " + expected);
+    }
+
+    /**
+     * A random source whose first draw succeeds and whose bonus draw selects the requested level
+     * gain of the diamond rune (1, 2 or 3).
+     */
+    private static RandomSource randomSucceedingWithGain(double chance, int expectedGain) {
+        for (long seed = 0; seed < 100_000L; seed++) {
+            RandomSource probe = RandomSource.create(seed);
+            if (probe.nextDouble() * 100.0D < chance && probe.nextInt(3) == expectedGain - 1) {
+                return RandomSource.create(seed);
+            }
+        }
+        throw new IllegalStateException("No succeeding seed for chance " + chance + " and gain " + expectedGain);
     }
 
     // ---------------------------------------------------------------- data map
@@ -185,6 +201,56 @@ public final class UpgradeTableGameTests {
         helper.succeed();
     }
 
+    @GameTest(template = "empty")
+    public static void protectionRuneDataLoads(GameTestHelper helper) {
+        ProtectionRuneData protection = ProtectionRuneData.getData(ModItems.PROTECTION_RUNE.get());
+        helper.assertTrue(protection != null, "Protection rune must have data map values");
+        helper.assertTrue(protection.levelLossPercent() == 50.0D,
+                "Protection rune must lose 50 % of the level");
+        helper.assertTrue(protection.successLevels().equals(List.of(1)),
+                "Protection rune must grant a flat +1");
+        helper.assertFalse(protection.hasSuccessBonus(),
+                "Protection rune must not have a success bonus");
+
+        ProtectionRuneData iron = ProtectionRuneData.getData(ModItems.IRON_PROTECTION_RUNE.get());
+        helper.assertTrue(iron != null && iron.levelLossPercent() == 25.0D,
+                "Iron protection rune must lose 25 % of the level");
+
+        ProtectionRuneData golden = ProtectionRuneData.getData(ModItems.GOLDEN_PROTECTION_RUNE.get());
+        helper.assertTrue(golden != null && golden.levelLossPercent() == 10.0D,
+                "Golden protection rune must lose 10 % of the level");
+
+        ProtectionRuneData diamond = ProtectionRuneData.getData(ModItems.DIAMOND_PROTECTION_RUNE.get());
+        helper.assertTrue(diamond != null && diamond.levelLossPercent() == 10.0D,
+                "Diamond protection rune must lose 10 % of the level");
+        helper.assertTrue(diamond.successLevels().equals(List.of(1, 2, 3)),
+                "Diamond protection rune must roll +1, +2 or +3");
+        helper.assertTrue(diamond.hasSuccessBonus(),
+                "Diamond protection rune must have a success bonus");
+
+        helper.assertTrue(ProtectionRuneData.getData(Items.DIAMOND_SWORD) == null,
+                "A sword must not have protection rune data");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void protectionRuneLevelLoss(GameTestHelper helper) {
+        ProtectionRuneData protection = ProtectionRuneData.getData(ModItems.PROTECTION_RUNE.get());
+        ProtectionRuneData iron = ProtectionRuneData.getData(ModItems.IRON_PROTECTION_RUNE.get());
+        ProtectionRuneData golden = ProtectionRuneData.getData(ModItems.GOLDEN_PROTECTION_RUNE.get());
+        helper.assertTrue(protection != null && iron != null && golden != null,
+                "Protection rune data must be present");
+
+        helper.assertTrue(protection.levelLoss(20) == 10, "+20 with 50 % must lose 10 levels");
+        helper.assertTrue(protection.levelLoss(1) == 1, "A 50 % rune must lose at least one level");
+        helper.assertTrue(protection.levelLoss(0) == 0, "A rune must not lose a level at +0");
+        helper.assertTrue(iron.levelLoss(20) == 5, "+20 with 25 % must lose 5 levels");
+        helper.assertTrue(iron.levelLoss(3) == 1, "+3 with 25 % must lose at least one level");
+        helper.assertTrue(golden.levelLoss(20) == 2, "+20 with 10 % must lose 2 levels");
+        helper.assertTrue(golden.levelLoss(9) == 1, "+9 with 10 % must lose at least one level");
+        helper.succeed();
+    }
+
     // ---------------------------------------------------------------- preview
 
     @GameTest(template = "empty")
@@ -217,6 +283,18 @@ public final class UpgradeTableGameTests {
     }
 
     @GameTest(template = "empty")
+    public static void previewAcceptsProtectionRune(GameTestHelper helper) {
+        ItemStack heaven = new ItemStack(ModItems.HEAVEN_STONE.get());
+        ItemStack rune = new ItemStack(ModItems.PROTECTION_RUNE.get());
+
+        UpgradeTableHelper.Preview preview = UpgradeTableHelper.preview(swordAt(10), heaven, rune);
+        helper.assertTrue(preview.valid(), "A valid protection rune must keep the attempt valid");
+        helper.assertTrue(preview.chance() == 27.27D,
+                "A protection rune must not change the success chance");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
     public static void previewRejectsInvalidInputs(GameTestHelper helper) {
         ItemStack sword = new ItemStack(Items.DIAMOND_SWORD);
         ItemStack heaven = new ItemStack(ModItems.HEAVEN_STONE.get());
@@ -232,7 +310,7 @@ public final class UpgradeTableGameTests {
         assertReason(helper, UpgradeTableHelper.preview(sword, new ItemStack(Items.DIRT), ItemStack.EMPTY),
                 UpgradeTableHelper.Reason.NOT_A_STONE, "dirt as stone");
         assertReason(helper, UpgradeTableHelper.preview(sword, heaven, new ItemStack(Items.DIAMOND)),
-                UpgradeTableHelper.Reason.RUNE_NOT_SUPPORTED, "rune slot filled");
+                UpgradeTableHelper.Reason.NOT_A_RUNE, "diamond as rune");
         assertReason(helper, UpgradeTableHelper.preview(swordAt(30), heaven, ItemStack.EMPTY),
                 UpgradeTableHelper.Reason.MAX_LEVEL, "heaven stone at +30");
         assertReason(helper, UpgradeTableHelper.preview(swordAt(15), power, ItemStack.EMPTY),
@@ -331,6 +409,153 @@ public final class UpgradeTableGameTests {
                 "A destroying failure at +4 must remove the item");
         helper.assertTrue(table.getItem(UpgradeTableBlockEntity.SLOT_STONE).isEmpty(),
                 "A destroying failure must consume the stone");
+        helper.succeed();
+    }
+
+    @GameTest(template = "altar")
+    public static void protectionRunePreventsDestruction(GameTestHelper helper) {
+        UpgradeTableBlockEntity table = placeTable(helper);
+        table.setItem(UpgradeTableBlockEntity.SLOT_ITEM, swordAt(10));
+        table.setItem(UpgradeTableBlockEntity.SLOT_STONE, new ItemStack(ModItems.HEAVEN_STONE.get()));
+        table.setItem(UpgradeTableBlockEntity.SLOT_RUNE, new ItemStack(ModItems.PROTECTION_RUNE.get()));
+
+        helper.assertTrue(table.performUpgrade(randomFailingWithOutcome(27.27D, 10, DESTROY)),
+                "A +10 heaven stone attempt with a rune must be valid");
+        helper.assertTrue(UpgradeHelper.getLevel(table.getItem(UpgradeTableBlockEntity.SLOT_ITEM)) == 5,
+                "A 50 % rune must turn destruction at +10 into +5");
+        helper.assertTrue(table.getItem(UpgradeTableBlockEntity.SLOT_ITEM).is(Items.DIAMOND_SWORD),
+                "The protected item must survive");
+        helper.assertTrue(table.getItem(UpgradeTableBlockEntity.SLOT_STONE).isEmpty(),
+                "The stone must be consumed");
+        helper.assertTrue(table.getItem(UpgradeTableBlockEntity.SLOT_RUNE).isEmpty(),
+                "The rune must be consumed");
+        helper.succeed();
+    }
+
+    @GameTest(template = "altar")
+    public static void protectionRuneDoesNotChangeKeep(GameTestHelper helper) {
+        UpgradeTableBlockEntity table = placeTable(helper);
+        table.setItem(UpgradeTableBlockEntity.SLOT_ITEM, swordAt(4));
+        table.setItem(UpgradeTableBlockEntity.SLOT_STONE, new ItemStack(ModItems.HEAVEN_STONE.get()));
+        table.setItem(UpgradeTableBlockEntity.SLOT_RUNE, new ItemStack(ModItems.PROTECTION_RUNE.get()));
+
+        helper.assertTrue(table.performUpgrade(randomFailingWithOutcome(60.0D, 4, KEEP)),
+                "A +4 heaven stone attempt with a rune must be valid");
+        helper.assertTrue(UpgradeHelper.getLevel(table.getItem(UpgradeTableBlockEntity.SLOT_ITEM)) == 4,
+                "A keep failure must stay a keep failure with a rune");
+        helper.assertTrue(table.getItem(UpgradeTableBlockEntity.SLOT_RUNE).is(ModItems.PROTECTION_RUNE.get()),
+                "A keep failure must not consume the rune");
+        helper.succeed();
+    }
+
+    @GameTest(template = "altar")
+    public static void protectionRuneDoesNotChangeLoseLevel(GameTestHelper helper) {
+        UpgradeTableBlockEntity table = placeTable(helper);
+        table.setItem(UpgradeTableBlockEntity.SLOT_ITEM, swordAt(4));
+        table.setItem(UpgradeTableBlockEntity.SLOT_STONE, new ItemStack(ModItems.HEAVEN_STONE.get()));
+        table.setItem(UpgradeTableBlockEntity.SLOT_RUNE, new ItemStack(ModItems.PROTECTION_RUNE.get()));
+
+        helper.assertTrue(table.performUpgrade(randomFailingWithOutcome(60.0D, 4, LOSE_LEVEL)),
+                "A +4 heaven stone attempt with a rune must be valid");
+        helper.assertTrue(UpgradeHelper.getLevel(table.getItem(UpgradeTableBlockEntity.SLOT_ITEM)) == 3,
+                "A level-loss failure must stay -1 with a rune");
+        helper.assertTrue(table.getItem(UpgradeTableBlockEntity.SLOT_RUNE).is(ModItems.PROTECTION_RUNE.get()),
+                "A level-loss failure must not consume the rune");
+        helper.succeed();
+    }
+
+    @GameTest(template = "altar")
+    public static void diamondRuneSuccessBonus(GameTestHelper helper) {
+        UpgradeTableBlockEntity table = placeTable(helper);
+
+        for (int gain = 1; gain <= 3; gain++) {
+            table.setItem(UpgradeTableBlockEntity.SLOT_ITEM, new ItemStack(Items.DIAMOND_SWORD));
+            table.setItem(UpgradeTableBlockEntity.SLOT_STONE, new ItemStack(ModItems.HEAVEN_STONE.get()));
+            table.setItem(UpgradeTableBlockEntity.SLOT_RUNE,
+                    new ItemStack(ModItems.DIAMOND_PROTECTION_RUNE.get()));
+
+            helper.assertTrue(table.performUpgrade(randomSucceedingWithGain(100.0D, gain)),
+                    "A +0 diamond rune attempt must be valid");
+            helper.assertTrue(UpgradeHelper.getLevel(table.getItem(UpgradeTableBlockEntity.SLOT_ITEM)) == gain,
+                    "The diamond rune must grant +" + gain);
+            helper.assertTrue(table.getItem(UpgradeTableBlockEntity.SLOT_RUNE)
+                            .is(ModItems.DIAMOND_PROTECTION_RUNE.get()),
+                    "A success must not consume the rune");
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = "altar")
+    public static void diamondRuneBonusCappedAtStoneMaxLevel(GameTestHelper helper) {
+        UpgradeTableBlockEntity table = placeTable(helper);
+        table.setItem(UpgradeTableBlockEntity.SLOT_ITEM, swordAt(14));
+        table.setItem(UpgradeTableBlockEntity.SLOT_STONE, new ItemStack(ModItems.POWER_STONE.get()));
+        table.setItem(UpgradeTableBlockEntity.SLOT_RUNE, new ItemStack(ModItems.DIAMOND_PROTECTION_RUNE.get()));
+
+        helper.assertTrue(table.performUpgrade(randomSucceedingWithGain(20.0D, 3)),
+                "A +14 power stone attempt must be valid");
+        helper.assertTrue(UpgradeHelper.getLevel(table.getItem(UpgradeTableBlockEntity.SLOT_ITEM)) == 15,
+                "The diamond bonus must not push past the stone's max level");
+        helper.succeed();
+    }
+
+    @GameTest(template = "altar")
+    public static void invalidAttemptDoesNotConsumeRune(GameTestHelper helper) {
+        UpgradeTableBlockEntity table = placeTable(helper);
+        table.setItem(UpgradeTableBlockEntity.SLOT_ITEM, swordAt(30));
+        table.setItem(UpgradeTableBlockEntity.SLOT_STONE, new ItemStack(ModItems.HEAVEN_STONE.get()));
+        table.setItem(UpgradeTableBlockEntity.SLOT_RUNE, new ItemStack(ModItems.PROTECTION_RUNE.get()));
+
+        helper.assertFalse(table.performUpgrade(RandomSource.create(0L)),
+                "A +30 heaven stone attempt must be rejected");
+        helper.assertTrue(UpgradeHelper.getLevel(table.getItem(UpgradeTableBlockEntity.SLOT_ITEM)) == 30,
+                "A rejected attempt must not change the item");
+        helper.assertTrue(table.getItem(UpgradeTableBlockEntity.SLOT_STONE).is(ModItems.HEAVEN_STONE.get()),
+                "A rejected attempt must not consume the stone");
+        helper.assertTrue(table.getItem(UpgradeTableBlockEntity.SLOT_RUNE).is(ModItems.PROTECTION_RUNE.get()),
+                "A rejected attempt must not consume the rune");
+        helper.succeed();
+    }
+
+    @GameTest(template = "altar")
+    public static void protectionRuneNotConsumedOnSuccess(GameTestHelper helper) {
+        UpgradeTableBlockEntity table = placeTable(helper);
+        table.setItem(UpgradeTableBlockEntity.SLOT_ITEM, new ItemStack(Items.DIAMOND_SWORD));
+        table.setItem(UpgradeTableBlockEntity.SLOT_STONE, new ItemStack(ModItems.HEAVEN_STONE.get()));
+        table.setItem(UpgradeTableBlockEntity.SLOT_RUNE, new ItemStack(ModItems.PROTECTION_RUNE.get()));
+
+        helper.assertTrue(table.performUpgrade(randomSucceeding(100.0D)),
+                "A +0 heaven stone attempt with a rune must be valid");
+        helper.assertTrue(UpgradeHelper.getLevel(table.getItem(UpgradeTableBlockEntity.SLOT_ITEM)) == 1,
+                "A success must raise the item to +1");
+        helper.assertTrue(table.getItem(UpgradeTableBlockEntity.SLOT_STONE).isEmpty(),
+                "A success must consume the stone");
+        helper.assertTrue(table.getItem(UpgradeTableBlockEntity.SLOT_RUNE).is(ModItems.PROTECTION_RUNE.get()),
+                "A success must not consume the rune");
+        helper.succeed();
+    }
+
+    @GameTest(template = "altar")
+    public static void runeStackConsumedOnePerProtection(GameTestHelper helper) {
+        UpgradeTableBlockEntity table = placeTable(helper);
+        table.setItem(UpgradeTableBlockEntity.SLOT_ITEM, swordAt(10));
+        table.setItem(UpgradeTableBlockEntity.SLOT_STONE, new ItemStack(ModItems.HEAVEN_STONE.get(), 3));
+        table.setItem(UpgradeTableBlockEntity.SLOT_RUNE,
+                new ItemStack(ModItems.GOLDEN_PROTECTION_RUNE.get(), 3));
+
+        double[] chances = {27.27D, 30.0D, 33.33D};
+        for (int attempt = 1; attempt <= 3; attempt++) {
+            int level = 11 - attempt;
+            helper.assertTrue(table.performUpgrade(
+                            randomFailingWithOutcome(chances[attempt - 1], level, DESTROY)),
+                    "Protection attempt " + attempt + " must be valid");
+            helper.assertTrue(UpgradeHelper.getLevel(table.getItem(UpgradeTableBlockEntity.SLOT_ITEM)) == level - 1,
+                    "Protection attempt " + attempt + " must lose one level");
+            helper.assertTrue(table.getItem(UpgradeTableBlockEntity.SLOT_RUNE).getCount() == 3 - attempt,
+                    "Protection attempt " + attempt + " must consume exactly one rune");
+        }
+        helper.assertTrue(table.getItem(UpgradeTableBlockEntity.SLOT_RUNE).isEmpty(),
+                "The last rune must empty the slot");
         helper.succeed();
     }
 
@@ -450,8 +675,11 @@ public final class UpgradeTableGameTests {
                                 .getMaxStackSize(new ItemStack(ModItems.HEAVEN_STONE.get())));
         helper.assertTrue(menu.getSlot(UpgradeTableBlockEntity.SLOT_ITEM).getMaxStackSize() == 1,
                 "The item slot must stay limited to one item");
-        helper.assertTrue(menu.getSlot(UpgradeTableBlockEntity.SLOT_RUNE).getMaxStackSize() == 1,
-                "The rune slot must stay limited to one rune");
+        helper.assertTrue(menu.getSlot(UpgradeTableBlockEntity.SLOT_RUNE)
+                        .getMaxStackSize(new ItemStack(ModItems.PROTECTION_RUNE.get())) == 64,
+                "The rune slot must accept a full rune stack, got "
+                        + menu.getSlot(UpgradeTableBlockEntity.SLOT_RUNE)
+                                .getMaxStackSize(new ItemStack(ModItems.PROTECTION_RUNE.get())));
         helper.succeed();
     }
 
@@ -469,8 +697,11 @@ public final class UpgradeTableGameTests {
                 "The item slot must accept upgradable weapons");
         helper.assertFalse(table.canPlaceItem(UpgradeTableBlockEntity.SLOT_ITEM, heaven),
                 "The item slot must reject stones");
+        helper.assertTrue(table.canPlaceItem(UpgradeTableBlockEntity.SLOT_RUNE,
+                        new ItemStack(ModItems.PROTECTION_RUNE.get())),
+                "The rune slot must accept protection runes");
         helper.assertFalse(table.canPlaceItem(UpgradeTableBlockEntity.SLOT_RUNE, new ItemStack(Items.DIAMOND)),
-                "The rune slot must stay empty until runes exist");
+                "The rune slot must reject non-rune items");
         helper.succeed();
     }
 

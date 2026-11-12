@@ -1,0 +1,17 @@
+{
+  "values": {
+    "himmelsstein:protection_rune": {
+      "level_loss_percent": 50.0
+    },
+    "himmelsstein:iron_protection_rune": {
+      "level_loss_percent": 25.0
+    },
+    "himmelsstein:golden_protection_rune": {
+      "level_loss_percent": 10.0
+    },
+    "himmelsstein:diamond_protection_rune": {
+      "level_loss_percent": 10.0,
+      "success_levels": [1, 2, 3]
+    }
+  }
+}

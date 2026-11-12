@@ -157,7 +157,7 @@ public class UpgradeTableScreen extends AbstractContainerScreen<UpgradeTableMenu
             case NO_STONE -> "reason.no_stone";
             case NOT_A_STONE -> "reason.not_a_stone";
             case MAX_LEVEL -> "reason.max_level";
-            case RUNE_NOT_SUPPORTED -> "reason.rune_not_supported";
+            case NOT_A_RUNE -> "reason.not_a_rune";
             case OK -> "button";
         };
         return Component.translatable("container." + Himmelsstein.MODID + ".upgrade_table." + key);
