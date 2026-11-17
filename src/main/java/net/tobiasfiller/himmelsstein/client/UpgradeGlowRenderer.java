@@ -62,8 +62,8 @@ public final class UpgradeGlowRenderer {
     private static final String GLOW_TARGET = "glow";
     private static final String WIDE_TARGET = "wide";
     private static final String MIST_TARGET = "mist";
-    private static final String MIST_RESULT = "swap";
-    private static final String HALO_RESULT = "halo";
+    private static final String WORLD_DEPTH_TARGET = "world_depth";
+    private static final String FINAL_RESULT = "final";
 
     // Halo width in pixels at 1080p for +1 and +30, scaled with the window height. The wide
     // light uses a multiple of this (RadiusMultiplier in the post chain).
@@ -155,6 +155,10 @@ public final class UpgradeGlowRenderer {
         return postChain == null ? null : postChain.getTempTarget(MIST_TARGET);
     }
 
+    static RenderTarget worldDepthTarget() {
+        return postChain == null ? null : postChain.getTempTarget(WORLD_DEPTH_TARGET);
+    }
+
     // ---------------------------------------------------------------- frame lifecycle
 
     public static void beginFrame() {
@@ -185,8 +189,13 @@ public final class UpgradeGlowRenderer {
         }
         phase = Phase.NONE;
 
+        RenderTarget main = Minecraft.getInstance().getMainRenderTarget();
+        // Preserve the level depth: the hand pass replaces the glow targets' depth with the item
+        // depth, but the final composite still needs to know what was behind the hand.
+        worldDepthTarget().copyDepthFrom(main);
+        main.bindWrite(false);
+
         if (worldRecorded) {
-            RenderTarget main = Minecraft.getInstance().getMainRenderTarget();
             glowTarget().copyDepthFrom(main);
             wideTarget().copyDepthFrom(main);
             mistTarget().copyDepthFrom(main);
@@ -234,6 +243,15 @@ public final class UpgradeGlowRenderer {
             return;
         }
         phase = Phase.NONE;
+        if (postChain != null) {
+            // The main depth now contains the first-person item. Copy it into the offscreen targets
+            // so the bolt glow is clipped by the item just like the direct bolt ribbons.
+            RenderTarget main = Minecraft.getInstance().getMainRenderTarget();
+            glowTarget().copyDepthFrom(main);
+            wideTarget().copyDepthFrom(main);
+            mistTarget().copyDepthFrom(main);
+            main.bindWrite(false);
+        }
         BUFFERS.flush(true);
     }
 
@@ -255,16 +273,12 @@ public final class UpgradeGlowRenderer {
         main.bindWrite(false);
         RenderSystem.enableBlend();
         RenderSystem.blendFunc(GlStateManager.SourceFactor.ONE, GlStateManager.DestFactor.ONE);
-        postChain.getTempTarget(HALO_RESULT).blitToScreen(width, height, false);
-        if (UpgradeGlow.hasWideAura(maxLevelThisFrame)) {
-            wideTarget().blitToScreen(width, height, false);
-        }
-        if (UpgradeGlow.hasHandAura(maxLevelThisFrame)) {
-            // The mask pass writes the item-occluded mist into the swap target.
-            postChain.getTempTarget(MIST_RESULT).blitToScreen(width, height, false);
-        }
+        // The final pass adds halo, wide light and mist and removes everything the hand occludes.
+        postChain.getTempTarget(FINAL_RESULT).blitToScreen(width, height, false);
         RenderSystem.defaultBlendFunc();
         RenderSystem.disableBlend();
+        // blitToScreen leaves the depth test disabled.
+        RenderSystem.enableDepthTest();
         main.bindWrite(true);
 
         targetsNeedClear = true;
@@ -435,7 +449,7 @@ public final class UpgradeGlowRenderer {
     private static void renderHandAura(UpgradeRenderTypes.PhaseTypes types, Vector3f center, float half,
             Effect effect, boolean hand, boolean deferredHandSpace) {
         float progress = UpgradeGlow.handAuraProgress(effect.level());
-        float brightness = effect.glowBrightness() * (0.55F + 0.45F * progress) * 2.0F;
+        float brightness = effect.glowBrightness() * (0.55F + 0.45F * progress) * 4.0F;
         int color = FastColor.ARGB32.color(255, Math.round(effect.red() * brightness * 255.0F),
                 Math.round(effect.green() * brightness * 255.0F),
                 Math.round(effect.blue() * brightness * 255.0F));

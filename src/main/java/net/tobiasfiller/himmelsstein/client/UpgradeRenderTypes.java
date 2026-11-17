@@ -31,6 +31,8 @@ public final class UpgradeRenderTypes {
             ResourceLocation.fromNamespaceAndPath(Himmelsstein.MODID, "upgrade_glow");
     public static final ResourceLocation GLINT_SHADER_ID =
             ResourceLocation.fromNamespaceAndPath(Himmelsstein.MODID, "upgrade_glint");
+    public static final ResourceLocation MIST_SHADER_ID =
+            ResourceLocation.fromNamespaceAndPath(Himmelsstein.MODID, "upgrade_mist");
     private static final ResourceLocation GLINT_TEXTURE =
             ResourceLocation.fromNamespaceAndPath(Himmelsstein.MODID, "textures/misc/upgrade_glint_item.png");
     private static final ResourceLocation MIST_TEXTURE =
@@ -45,6 +47,7 @@ public final class UpgradeRenderTypes {
 
     private static ShaderInstance glowShader;
     private static ShaderInstance glintShader;
+    private static ShaderInstance mistShader;
 
     /** Render types for baked item models (block atlas) within one phase. */
     public record PhaseTypes(boolean hand, RenderType glow, RenderType wide, RenderType mist, RenderType boltGlow,
@@ -68,6 +71,8 @@ public final class UpgradeRenderTypes {
             new RenderStateShard.ShaderStateShard(() -> glowShader);
     private static final RenderStateShard.ShaderStateShard GLINT_SHADER_STATE =
             new RenderStateShard.ShaderStateShard(() -> glintShader);
+    private static final RenderStateShard.ShaderStateShard MIST_SHADER_STATE =
+            new RenderStateShard.ShaderStateShard(() -> mistShader);
 
     public static final PhaseTypes WORLD = createPhase(false);
     public static final PhaseTypes HAND = createPhase(true);
@@ -92,8 +97,12 @@ public final class UpgradeRenderTypes {
         glintShader = shader;
     }
 
+    public static void setMistShader(ShaderInstance shader) {
+        mistShader = shader;
+    }
+
     public static boolean shadersReady() {
-        return glowShader != null && glintShader != null;
+        return glowShader != null && glintShader != null && mistShader != null;
     }
 
     public static TexturedTypes textured(boolean hand, ResourceLocation texture) {
@@ -131,7 +140,9 @@ public final class UpgradeRenderTypes {
                 RenderType.CompositeState.builder()
                         .setShaderState(RenderStateShard.RENDERTYPE_LIGHTNING_SHADER)
                         .setTransparencyState(RenderStateShard.NO_TRANSPARENCY)
-                        .setDepthTestState(offscreenDepth(hand))
+                        // The hand pass copies the item depth into the offscreen targets before
+                        // flushing, so bolt glow behind the item is discarded like the direct bolt.
+                        .setDepthTestState(RenderStateShard.LEQUAL_DEPTH_TEST)
                         .setCullState(RenderStateShard.NO_CULL)
                         .setWriteMaskState(RenderStateShard.COLOR_WRITE)
                         .setOutputState(glowOutput(hand))
@@ -155,12 +166,15 @@ public final class UpgradeRenderTypes {
                 bolt);
     }
 
-    /** Soft cloud quads for the misty hand aura, blurred by the post chain. */
+    /**
+     * Soft cloud quads for the misty hand aura. Own shader so the texture's alpha fades the glow
+     * instead of being flattened to a hard silhouette; the post chain blurs the result.
+     */
     private static RenderType mist(String phase, boolean hand) {
         return RenderType.create(name("mist_" + phase), DefaultVertexFormat.NEW_ENTITY, VertexFormat.Mode.QUADS,
                 1536, false, false,
                 RenderType.CompositeState.builder()
-                        .setShaderState(GLOW_SHADER_STATE)
+                        .setShaderState(MIST_SHADER_STATE)
                         .setTextureState(new RenderStateShard.TextureStateShard(MIST_TEXTURE, true, false))
                         .setTransparencyState(RenderStateShard.NO_TRANSPARENCY)
                         .setDepthTestState(offscreenDepth(hand))

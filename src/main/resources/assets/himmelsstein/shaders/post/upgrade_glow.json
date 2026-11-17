@@ -4,7 +4,9 @@
         "glow",
         "halo",
         "wide",
-        "mist"
+        "mist",
+        "world_depth",
+        "final"
     ],
     "passes": [
         {
@@ -135,6 +137,18 @@
             "use_linear_filter": true,
             "auxtargets": [
                 { "name": "GlowSampler", "id": "glow" }
+            ]
+        },
+        {
+            "name": "himmelsstein:upgrade_glow_composite",
+            "intarget": "halo",
+            "outtarget": "final",
+            "use_linear_filter": true,
+            "auxtargets": [
+                { "name": "WideSampler", "id": "wide" },
+                { "name": "MistSampler", "id": "swap" },
+                { "name": "WorldDepth", "id": "world_depth:depth" },
+                { "name": "ScreenDepth", "id": "minecraft:main:depth" }
             ]
         }
     ]

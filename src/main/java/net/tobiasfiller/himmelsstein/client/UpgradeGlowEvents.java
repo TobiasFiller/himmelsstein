@@ -25,6 +25,8 @@ public final class UpgradeGlowEvents {
                 DefaultVertexFormat.NEW_ENTITY), UpgradeRenderTypes::setGlowShader);
         event.registerShader(new ShaderInstance(event.getResourceProvider(), UpgradeRenderTypes.GLINT_SHADER_ID,
                 DefaultVertexFormat.NEW_ENTITY), UpgradeRenderTypes::setGlintShader);
+        event.registerShader(new ShaderInstance(event.getResourceProvider(), UpgradeRenderTypes.MIST_SHADER_ID,
+                DefaultVertexFormat.NEW_ENTITY), UpgradeRenderTypes::setMistShader);
     }
 
     @SubscribeEvent

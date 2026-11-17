@@ -20,22 +20,25 @@ import net.tobiasfiller.himmelsstein.core.utility.UpgradeStoneData;
 import net.tobiasfiller.himmelsstein.core.utility.UpgradeTableHelper;
 
 /**
- * Upgrade table GUI. The small plaque at the top shows the success chance, the icon below the
- * slots starts the attempt. Details (chance, max level) are tooltips.
+ * Upgrade table GUI. The small plaques at the top show the success chance and the current upgrade
+ * level, the icon below the slots starts the attempt. Details (chance, max level) are tooltips.
  */
 public class UpgradeTableScreen extends AbstractContainerScreen<UpgradeTableMenu> {
     private static final ResourceLocation TEXTURE =
-            ResourceLocation.fromNamespaceAndPath(Himmelsstein.MODID, "textures/gui/upgrade_table.png");
+            ResourceLocation.fromNamespaceAndPath(Himmelsstein.MODID, "textures/gui/upgrade_table_runes.png");
 
-    // Small chance plaque at the top centre of the texture.
-    private static final int CHANCE_X = 80;
-    private static final int CHANCE_Y = 11;
+    // Small plaques at the top of the texture: chance on the left, upgrade level on the right.
+    private static final int CHANCE_X = 70;
+    private static final int CHANCE_Y = 15;
     private static final int CHANCE_WIDTH = 16;
     private static final int CHANCE_HEIGHT = 8;
+    private static final int LEVEL_X = 88;
+    private static final int LEVEL_Y = 15;
+    private static final int LEVEL_WIDTH = 16;
 
     // 16x16 icon button below the slots.
     private static final int BUTTON_X = 80;
-    private static final int BUTTON_Y = 63;
+    private static final int BUTTON_Y = 60;
     private static final int BUTTON_SIZE = 16;
 
     public UpgradeTableScreen(UpgradeTableMenu menu, Inventory inventory, Component title) {
@@ -70,6 +73,7 @@ public class UpgradeTableScreen extends AbstractContainerScreen<UpgradeTableMenu
     protected void renderBg(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
         graphics.blit(TEXTURE, leftPos, topPos, 0, 0, imageWidth, imageHeight);
         renderChance(graphics);
+        renderLevel(graphics);
         renderButtonState(graphics, mouseX, mouseY);
     }
 
@@ -77,10 +81,25 @@ public class UpgradeTableScreen extends AbstractContainerScreen<UpgradeTableMenu
         UpgradeTableHelper.Preview preview = menu.getPreview();
         String text = preview.valid() ? Math.round(preview.chance()) + "%" : "--";
         int color = preview.valid() ? 0xFFFFFF : 0xAAAAAA;
-        float scale = Math.min(1.0F, (CHANCE_WIDTH - 1) / (float) font.width(text));
+        renderPlaqueText(graphics, CHANCE_X, CHANCE_Y, CHANCE_WIDTH, text, color, text);
+    }
+
+    private void renderLevel(GuiGraphics graphics) {
+        ItemStack item = menu.getSlot(UpgradeTableBlockEntity.SLOT_ITEM).getItem();
+        boolean upgradable = UpgradeHelper.isUpgradable(item);
+        String text = upgradable ? "+" + UpgradeHelper.getLevel(item) : "--";
+        int color = upgradable ? 0xFFFFFF : 0xAAAAAA;
+        // Always use the two-digit size, so +0 and +30 render at the same scale.
+        String scaleReference = "+" + UpgradeHelper.MAX_LEVEL;
+        renderPlaqueText(graphics, LEVEL_X, LEVEL_Y, LEVEL_WIDTH, text, color, scaleReference);
+    }
+
+    private void renderPlaqueText(GuiGraphics graphics, int x, int y, int width, String text, int color,
+            String scaleReference) {
+        float scale = Math.min(1.0F, (width - 1) / (float) font.width(scaleReference));
 
         graphics.pose().pushPose();
-        graphics.pose().translate(leftPos + CHANCE_X + CHANCE_WIDTH / 2.0F, topPos + CHANCE_Y + 1.0F, 0.0F);
+        graphics.pose().translate(leftPos + x + width / 2.0F, topPos + y + 1.0F, 0.0F);
         graphics.pose().scale(scale, scale, 1.0F);
         graphics.drawString(font, text, -font.width(text) / 2, 0, color, false);
         graphics.pose().popPose();

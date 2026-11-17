@@ -2,7 +2,10 @@ package net.tobiasfiller.himmelsstein.common.menu;
 
 import javax.annotation.Nullable;
 
+import com.mojang.datafixers.util.Pair;
+
 import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.Container;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.player.Inventory;
@@ -10,6 +13,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
+import net.tobiasfiller.himmelsstein.Himmelsstein;
 import net.tobiasfiller.himmelsstein.common.blockentity.UpgradeTableBlockEntity;
 import net.tobiasfiller.himmelsstein.core.registry.ModMenuTypes;
 import net.tobiasfiller.himmelsstein.core.registry.ModTags;
@@ -24,6 +28,13 @@ import net.tobiasfiller.himmelsstein.core.utility.UpgradeTableHelper;
  */
 public class UpgradeTableMenu extends AbstractContainerMenu {
     public static final int BUTTON_UPGRADE = 0;
+
+    private static final ResourceLocation BLOCKS_ATLAS =
+            ResourceLocation.withDefaultNamespace("textures/atlas/blocks.png");
+    private static final ResourceLocation EMPTY_STONE_SPRITE =
+            ResourceLocation.fromNamespaceAndPath(Himmelsstein.MODID, "item/empty_slot_upgrade_stone");
+    private static final ResourceLocation EMPTY_RUNE_SPRITE =
+            ResourceLocation.fromNamespaceAndPath(Himmelsstein.MODID, "item/empty_slot_protection_rune");
 
     // Slot positions inside the GUI texture (top-left of the 16x16 item area, not the 18x18 frame).
     public static final int STONE_X = 51;
@@ -154,6 +165,12 @@ public class UpgradeTableMenu extends AbstractContainerMenu {
         public boolean mayPlace(ItemStack stack) {
             return stack.is(ModTags.UPGRADE_STONES);
         }
+
+        @Override
+        @Nullable
+        public Pair<ResourceLocation, ResourceLocation> getNoItemIcon() {
+            return Pair.of(BLOCKS_ATLAS, EMPTY_STONE_SPRITE);
+        }
     }
 
     private static class ItemSlot extends MachineSlot {
@@ -180,6 +197,12 @@ public class UpgradeTableMenu extends AbstractContainerMenu {
         @Override
         public boolean mayPlace(ItemStack stack) {
             return stack.is(ModTags.PROTECTION_RUNES);
+        }
+
+        @Override
+        @Nullable
+        public Pair<ResourceLocation, ResourceLocation> getNoItemIcon() {
+            return Pair.of(BLOCKS_ATLAS, EMPTY_RUNE_SPRITE);
         }
     }
 }
