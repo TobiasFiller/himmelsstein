@@ -7,7 +7,9 @@ import java.util.UUID;
 import com.mojang.authlib.GameProfile;
 
 import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.core.Holder;
 import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.nbt.Tag;
@@ -27,6 +29,9 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.component.ItemAttributeModifiers;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.Enchantments;
+import net.minecraft.world.item.enchantment.ItemEnchantments;
 import net.minecraft.world.level.GameType;
 import net.neoforged.neoforge.common.damagesource.DamageContainer;
 import net.neoforged.neoforge.event.AnvilUpdateEvent;
@@ -393,6 +398,117 @@ public final class UpgradeGameTests {
         helper.succeed();
     }
 
+    // ---------------------------------------------------------------- durability/unbreakable
+
+    @GameTest(template = "empty")
+    public static void durabilityEffectsMatchTable(GameTestHelper helper) {
+        ItemStack sword = new ItemStack(Items.DIAMOND_SWORD);
+        int[][] expectations = {
+                {0, 0, 0}, {3, 0, 0},
+                {4, 1, 0}, {7, 1, 0},
+                {8, 2, 0}, {11, 2, 0},
+                {12, 3, 0}, {15, 3, 0},
+                {16, 4, 0}, {19, 4, 0},
+                {20, 5, 0}, {23, 5, 0},
+                {24, 5, 1}, {30, 5, 1}
+        };
+        for (int[] entry : expectations) {
+            int level = entry[0];
+            int expectedUnbreaking = entry[1];
+            boolean expectedUnbreakable = entry[2] == 1;
+            UpgradeHelper.setLevel(sword, level, helper.getLevel().registryAccess());
+            helper.assertTrue(unbreakingLevel(sword) == expectedUnbreaking,
+                    "+" + level + " must have Unbreaking " + expectedUnbreaking + " but was " + unbreakingLevel(sword));
+            helper.assertTrue(sword.has(DataComponents.UNBREAKABLE) == expectedUnbreakable,
+                    "+" + level + " unbreakable must be " + expectedUnbreakable);
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void upgradePreservesHigherExistingUnbreaking(GameTestHelper helper) {
+        ItemStack sword = new ItemStack(Items.DIAMOND_SWORD);
+        enchantUnbreaking(helper, sword, 3);
+        helper.assertTrue(unbreakingLevel(sword) == 3, "Precondition: sword must start with Unbreaking III");
+
+        // 0 -> +4 is an upgrade: max(existing 3, table 1) = 3.
+        UpgradeHelper.setLevel(sword, 4, helper.getLevel().registryAccess());
+        helper.assertTrue(unbreakingLevel(sword) == 3,
+                "Upgrade to +4 must preserve higher existing Unbreaking III");
+
+        // +4 -> +20 is an upgrade: max(existing 3, table 5) = 5.
+        UpgradeHelper.setLevel(sword, 20, helper.getLevel().registryAccess());
+        helper.assertTrue(unbreakingLevel(sword) == 5,
+                "Upgrade to +20 must raise to Unbreaking V");
+
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void downgradeAlwaysSetsTableValue(GameTestHelper helper) {
+        ItemStack sword = new ItemStack(Items.DIAMOND_SWORD);
+        enchantUnbreaking(helper, sword, 5);
+        // 0 -> +4 is an upgrade: max(existing 5, table 1) = 5.
+        UpgradeHelper.setLevel(sword, 4, helper.getLevel().registryAccess());
+        helper.assertTrue(unbreakingLevel(sword) == 5, "Precondition: Unbreaking V must be preserved at +4");
+
+        // +4 -> +3 is a downgrade: table value is 0, so Unbreaking is removed.
+        UpgradeHelper.setLevel(sword, 3, helper.getLevel().registryAccess());
+        helper.assertTrue(unbreakingLevel(sword) == 0,
+                "Downgrade below +4 must remove Unbreaking even if it was preserved earlier");
+
+        // Unbreakable downgrade: +24 -> +23 removes UNBREAKABLE.
+        ItemStack unbreakableSword = new ItemStack(Items.DIAMOND_SWORD);
+        UpgradeHelper.setLevel(unbreakableSword, 24, helper.getLevel().registryAccess());
+        helper.assertTrue(unbreakableSword.has(DataComponents.UNBREAKABLE),
+                "Precondition: +24 must be unbreakable");
+        UpgradeHelper.setLevel(unbreakableSword, 23, helper.getLevel().registryAccess());
+        helper.assertFalse(unbreakableSword.has(DataComponents.UNBREAKABLE),
+                "Downgrade from +24 to +23 must remove UNBREAKABLE");
+        helper.assertTrue(unbreakingLevel(unbreakableSword) == 5,
+                "Downgrade from +24 to +23 must keep Unbreaking V per table");
+
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void durabilityEffectsSurviveSerialization(GameTestHelper helper) {
+        ItemStack original = new ItemStack(Items.DIAMOND_SWORD);
+        UpgradeHelper.setLevel(original, 24, helper.getLevel().registryAccess());
+        helper.assertTrue(unbreakingLevel(original) == 5 && original.has(DataComponents.UNBREAKABLE),
+                "Precondition: +24 must have Unbreaking V and be unbreakable");
+
+        Tag saved = original.save(helper.getLevel().registryAccess());
+        ItemStack parsed = ItemStack.parse(helper.getLevel().registryAccess(), saved)
+                .orElseThrow(() -> new IllegalStateException("ItemStack did not round-trip"));
+
+        helper.assertTrue(UpgradeHelper.getLevel(parsed) == 24,
+                "Level must survive serialization");
+        helper.assertTrue(unbreakingLevel(parsed) == 5,
+                "Unbreaking V must survive serialization");
+        helper.assertTrue(parsed.has(DataComponents.UNBREAKABLE),
+                "Unbreakable must survive serialization");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void existingUpgradedItemIsMigratedOnNormalize(GameTestHelper helper) {
+        ItemStack sword = new ItemStack(Items.DIAMOND_SWORD);
+        // Simulate a pre-feature upgraded item: level component present, no durability effects.
+        sword.set(ModDataComponents.UPGRADE_LEVEL.get(), 10);
+        helper.assertTrue(unbreakingLevel(sword) == 0 && !sword.has(DataComponents.UNBREAKABLE),
+                "Precondition: simulated legacy item must have no durability effects");
+
+        UpgradeHelper.normalize(sword, helper.getLevel().registryAccess());
+
+        helper.assertTrue(UpgradeHelper.getLevel(sword) == 10, "Level must remain +10 after normalize");
+        helper.assertTrue(unbreakingLevel(sword) == 2,
+                "Normalize must sync +10 to Unbreaking II");
+        helper.assertFalse(sword.has(DataComponents.UNBREAKABLE),
+                "Normalize must not make +10 unbreakable");
+        helper.succeed();
+    }
+
     // ---------------------------------------------------------------- helpers
 
     private static void assertCategory(GameTestHelper helper, ItemStack stack,
@@ -440,5 +556,25 @@ public final class UpgradeGameTests {
 
     private static boolean close(double actual, double expected) {
         return Math.abs(actual - expected) < EPSILON;
+    }
+
+    private static int unbreakingLevel(ItemStack stack) {
+        ItemEnchantments enchantments = stack.getOrDefault(DataComponents.ENCHANTMENTS, ItemEnchantments.EMPTY);
+        for (var entry : enchantments.entrySet()) {
+            if (entry.getKey().is(Enchantments.UNBREAKING)) {
+                return entry.getIntValue();
+            }
+        }
+        return 0;
+    }
+
+    private static void enchantUnbreaking(GameTestHelper helper, ItemStack stack, int level) {
+        Holder<Enchantment> holder = helper.getLevel().registryAccess()
+                .lookupOrThrow(Registries.ENCHANTMENT)
+                .getOrThrow(Enchantments.UNBREAKING);
+        ItemEnchantments.Mutable mutable = new ItemEnchantments.Mutable(
+                stack.getOrDefault(DataComponents.ENCHANTMENTS, ItemEnchantments.EMPTY));
+        mutable.set(holder, level);
+        stack.set(DataComponents.ENCHANTMENTS, mutable.toImmutable());
     }
 }

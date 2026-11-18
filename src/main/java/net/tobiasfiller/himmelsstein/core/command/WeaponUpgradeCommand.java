@@ -47,7 +47,7 @@ public final class WeaponUpgradeCommand {
             return 0;
         }
 
-        UpgradeHelper.setLevel(stack, level);
+        UpgradeHelper.setLevel(stack, level, source.registryAccess());
         source.sendSuccess(() -> Component.translatable(
                 "command.himmelsstein.weapon_upgrade.set", name, level), false);
         return 1;

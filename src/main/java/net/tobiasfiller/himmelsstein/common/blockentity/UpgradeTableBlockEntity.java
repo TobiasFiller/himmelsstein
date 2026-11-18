@@ -91,7 +91,7 @@ public class UpgradeTableBlockEntity extends BaseContainerBlockEntity {
         }
 
         switch (result.outcome()) {
-            case SUCCESS, FAIL_LOSE_LEVEL, FAIL_RUNE_PROTECT -> UpgradeHelper.setLevel(item, result.newLevel());
+            case SUCCESS, FAIL_LOSE_LEVEL, FAIL_RUNE_PROTECT -> UpgradeHelper.setLevel(item, result.newLevel(), level.registryAccess());
             case FAIL_KEEP -> {
                 // The item stays untouched.
             }
